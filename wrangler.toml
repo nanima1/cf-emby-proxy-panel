@@ -1,0 +1,22 @@
+name = "cf-emby-proxy-panel"
+main = "src/worker.js"
+compatibility_date = "2025-04-16"
+
+# Fill this after creating your D1 database:
+# wrangler d1 create cf-emby-proxy-panel
+#
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "cf-emby-proxy-panel"
+# database_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+
+# Optional runtime variables. You can also set them in the Cloudflare dashboard.
+# [vars]
+# ADMIN_TOKEN = "change-me"
+# CF_API_TOKEN = ""
+# CF_ZONE_ID = ""
+# CF_DOMAIN = "emby.example.com"
+# DEFAULT_TARGET = ""
+# BLOCKED_COUNTRIES = ""
+# BLOCKED_CLIENTS = "bot,crawler,spider,scrape,curl,wget,python-requests,scrapy"
+# BROWSER_MODE = "proxy"
