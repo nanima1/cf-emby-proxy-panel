@@ -2,8 +2,6 @@
 
 Cloudflare Worker 版 Emby 反代面板。你可以在网页面板里用 `/路径` 管理多个 Emby 上游，拉取优选 IP，并把选中的 IP 自动写入 Cloudflare DNS，让项目域名走 Cloudflare CDN 加速。
 
-这个项目整理自 `double.js`、`Pro-Worker.js` 的最终版逻辑，并合并了 `hbh-proxy worker.js` 与 `反代 + HTML.txt` 里的访问控制、状态页、客户端识别、流代理和缓存思路。
-
 ## 功能概览
 
 - 路径分流：用 `/hk`、`/jp`、`/home` 等路径添加不同 Emby。
