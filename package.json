@@ -1,0 +1,20 @@
+{
+  "name": "cf-emby-proxy-panel",
+  "version": "3.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Cloudflare Worker Emby reverse proxy panel with path routing, DNS automation, preferred IP tools, and D1 storage.",
+  "scripts": {
+    "check": "node --check src/worker.js",
+    "dry-run": "wrangler deploy --dry-run",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "d1:init": "wrangler d1 execute cf-emby-proxy-panel --file=./schema.sql"
+  },
+  "devDependencies": {
+    "wrangler": "^4.107.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
