@@ -610,6 +610,12 @@ npx wrangler d1 execute cf-emby-proxy-panel --remote --file=./schema.sql
 
 如果你要找别人帮忙排错，先点 `复制报告`。它会复制版本号、D1/DNS 状态、检查结果和建议动作，不会复制 Cloudflare Token 或面板密码。
 
+页面里还有 `项目版本` 卡片。它会尝试读取 GitHub main 分支最新提交：
+
+- 能显示最新提交，说明 Worker 可以访问 GitHub。
+- 如果显示版本检查不可用，不影响反代、路由、DNS 和播放统计。
+- 如果你自己设置了 `BUILD_SHA` 环境变量，面板还能更明确地判断当前部署是否已经是最新提交。
+
 ## 路由配置怎么备份和恢复
 
 建议在下面几种情况先点一次 `导出配置`：

@@ -13,6 +13,9 @@
 // - BROWSER_MODE: proxy | status | block. Route-level setting can override this.
 
 const VERSION = "3.0.0-combined";
+const REPO_OWNER = "nanima1";
+const REPO_NAME = "cf-emby-proxy-panel";
+const REPO_URL = `https://github.com/${REPO_OWNER}/${REPO_NAME}`;
 const COOKIE_NAME = "emby_panel_auth";
 const SESSION_TTL = 60 * 60 * 24 * 7;
 const DEFAULT_MODE = "clean";
@@ -144,6 +147,10 @@ async function handleApi(request, env, ctx) {
     });
   }
 
+  if (url.pathname === "/api/version-check") {
+    return handleVersionCheck(env);
+  }
+
   if (url.pathname === "/api/doctor") {
     return handleDoctorApi(env);
   }
@@ -190,6 +197,49 @@ async function handleApi(request, env, ctx) {
   }
 
   return json({ success: false, error: "API not found" }, 404);
+}
+
+async function handleVersionCheck(env) {
+  const currentSha = String(env.BUILD_SHA || env.GITHUB_SHA || env.COMMIT_SHA || "").trim();
+  const endpoint = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/commits/main`;
+  try {
+    const response = await fetch(endpoint, {
+      headers: {
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "cf-emby-proxy-panel",
+      },
+    });
+    const data = await response.json();
+    if (!response.ok || !data.sha) {
+      return json({
+        success: false,
+        version: VERSION,
+        repo: REPO_URL,
+        error: "GitHub version check failed",
+        detail: data.message || "",
+      }, 502);
+    }
+    const latestSha = data.sha || "";
+    return json({
+      success: true,
+      version: VERSION,
+      repo: REPO_URL,
+      currentSha,
+      latestSha,
+      latestShortSha: latestSha.slice(0, 7),
+      latestUrl: data.html_url || `${REPO_URL}/commits/main`,
+      latestDate: data.commit?.committer?.date || data.commit?.author?.date || "",
+      latestMessage: data.commit?.message || "",
+      upToDate: currentSha ? latestSha.startsWith(currentSha) || currentSha.startsWith(latestSha.slice(0, 12)) : null,
+    });
+  } catch (error) {
+    return json({
+      success: false,
+      version: VERSION,
+      repo: REPO_URL,
+      error: error.message || "GitHub version check failed",
+    }, 502);
+  }
 }
 
 async function handleDoctorApi(env) {
@@ -963,6 +1013,7 @@ function panelPage(env) {
 *{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#f7f8f2 0,#edf5f2 42%,#f8f1e5 100%);color:var(--ink);font-family:"Segoe UI","Microsoft YaHei",sans-serif}.wrap{max-width:1280px;margin:0 auto;padding:24px}.top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:20px}.title h1{margin:0;font-size:28px}.title p{margin:6px 0 0;color:var(--muted)}.grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(360px,.8fr);gap:18px}.card{background:rgba(255,253,247,.9);border:1px solid var(--line);box-shadow:var(--shadow);border-radius:8px;padding:18px}.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}.btn{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:7px;padding:10px 13px;font-weight:700;cursor:pointer}.btn:hover{border-color:#8b9b8e}.btn:disabled{opacity:.55;cursor:not-allowed}.primary{background:var(--blue);color:#fff;border-color:var(--blue)}.danger{color:var(--red);border-color:#f1b4b4}.green{color:var(--green);border-color:#a6d5bb}.muted{color:var(--muted)}input,select,textarea{width:100%;border:1px solid var(--line);border-radius:7px;background:#fff;padding:10px 12px;font:inherit}textarea{min-height:76px;resize:vertical}.field{margin-bottom:12px}.field label{display:block;font-size:13px;font-weight:700;color:var(--muted);margin-bottom:6px}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.routes{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px}.route{border:1px solid var(--line);border-radius:8px;background:#fff;padding:14px;display:flex;flex-direction:column;gap:11px}.route-head{display:flex;justify-content:space-between;gap:10px}.prefix{font-size:20px;font-weight:800}.badge{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:999px;padding:3px 8px;font-size:12px;color:var(--muted);background:#fafafa}.target{font-family:Consolas,monospace;font-size:12px;word-break:break-all;color:#335}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}.ip-list{display:grid;gap:8px;max-height:280px;overflow:auto}.ip-item{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;border:1px solid var(--line);border-radius:7px;padding:9px;background:#fff}.ip-item code{font-size:13px}.toast{position:fixed;left:50%;top:-80px;transform:translateX(-50%);background:#202124;color:#fff;border-radius:999px;padding:12px 18px;transition:.25s;z-index:10}.toast.show{top:18px}.empty{border:1px dashed var(--line);border-radius:8px;padding:26px;text-align:center;color:var(--muted)}.footer{margin-top:18px;color:var(--muted);font-size:13px}.split{display:flex;align-items:center;justify-content:space-between;gap:12px}.switch{display:flex;gap:8px;align-items:center}.switch input{width:auto}.small{font-size:12px}.status-line{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.doctor{margin-bottom:18px}.doctor-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-top:12px}.doctor-item{min-width:0;border:1px solid var(--line);border-radius:8px;background:#fff;padding:11px;display:grid;grid-template-columns:70px 1fr;gap:10px;align-items:start}.doctor-item.pass{border-color:#a6d5bb}.doctor-item.warn,.doctor-item.info{border-color:#efd0a8}.doctor-item.fail{border-color:#f1b4b4}.doctor-level{font-weight:800;font-size:12px;text-transform:uppercase}.doctor-item.pass .doctor-level{color:var(--green)}.doctor-item.warn .doctor-level{color:var(--orange)}.doctor-item.info .doctor-level{color:var(--muted)}.doctor-item.fail .doctor-level{color:var(--red)}.doctor-message{overflow-wrap:anywhere}.doctor-action{margin-top:4px;color:var(--muted);font-size:12px;overflow-wrap:anywhere}.wizard{margin-bottom:18px}.wizard[hidden]{display:none}.wizard-grid{display:grid;grid-template-columns:minmax(260px,.8fr) minmax(320px,1.2fr);gap:14px;margin-top:12px}.wizard-steps{display:grid;gap:8px}.wizard-step{border:1px solid var(--line);border-radius:8px;background:#fff;padding:10px;display:flex;justify-content:space-between;gap:10px;align-items:center}.wizard-step strong{overflow-wrap:anywhere}.wizard-form{display:grid;gap:10px}.wizard-form .row{align-items:end}
 .wizard-step{display:grid;grid-template-columns:1fr auto;gap:6px 10px;justify-content:normal}
 .dns-preview{display:grid;gap:8px;margin:8px 0 12px}.dns-preview[hidden]{display:none}.dns-plan{border:1px solid var(--line);border-radius:8px;background:#fff;padding:10px}.dns-plan h3{font-size:14px;margin:0 0 8px}.dns-records{display:grid;gap:6px}.dns-record{display:grid;grid-template-columns:64px 1fr;gap:8px;align-items:center;font-size:12px}.dns-record code{word-break:break-all}
+.version-card{margin-bottom:18px}
 .stats{margin-bottom:18px}.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:12px}.stat-box{border:1px solid var(--line);border-radius:8px;background:#fff;padding:12px}.stat-value{font-size:26px;font-weight:800}.stat-list{display:grid;gap:7px}.stat-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;border:1px solid var(--line);border-radius:7px;padding:8px;background:#fff}
 @media(max-width:900px){.grid,.wizard-grid{grid-template-columns:1fr}.wrap{padding:14px}.top{flex-direction:column}.row{grid-template-columns:1fr}.routes{grid-template-columns:1fr}}
 </style>
@@ -994,6 +1045,16 @@ function panelPage(env) {
       </div>
     </div>
     <div id="doctorList" class="doctor-list"></div>
+  </section>
+  <section class="card version-card" id="versionCard">
+    <div class="split">
+      <div>
+        <strong>项目版本</strong>
+        <p class="small muted" id="versionSummary">正在检查 GitHub 最新版本。</p>
+      </div>
+      <button class="btn" onclick="loadVersionCheck()">检查更新</button>
+    </div>
+    <div id="versionInfo" class="status-line"></div>
   </section>
   <section class="card wizard" id="wizardCard" hidden>
     <div class="split">
@@ -1085,6 +1146,7 @@ let routes = [];
 let ips = [];
 let envState = {};
 let doctorState = null;
+let versionState = null;
 let routeHealth = {};
 let wizardDismissed = false;
 const $ = (id) => document.getElementById(id);
@@ -1144,6 +1206,7 @@ function buildDoctorReport(data){
     "D1 binding: "+(envState.hasDb ? "yes" : "no"),
     "DNS env: "+(envState.hasDnsEnv ? "yes" : "no"),
     "Route count: "+routes.length,
+    "Latest commit: "+(versionState?.latestShortSha || "unknown"),
     "",
     "Checks:",
   ];
@@ -1157,9 +1220,31 @@ async function boot(){
   envState = await api("/api/env");
   $("dbBadge").textContent = envState.hasDb ? "D1 已绑定" : "D1 未绑定";
   $("dnsBadge").textContent = envState.hasDnsEnv ? "DNS 已配置: " + envState.cfDomain : "DNS 未配置";
+  loadVersionCheck();
   await loadDoctor();
   await loadRoutes();
   await loadStats();
+}
+async function loadVersionCheck(){
+  const summary = $("versionSummary");
+  const info = $("versionInfo");
+  if(!summary || !info) return;
+  summary.textContent = "正在检查 GitHub 最新版本。";
+  info.innerHTML = '<span class="badge">当前 '+escapeHtml(envState.version || "${VERSION}")+'</span><span class="badge">检查中</span>';
+  try {
+    const data = await api("/api/version-check");
+    versionState = data;
+    const stateText = data.upToDate === true ? "已是最新" : data.upToDate === false ? "可能有更新" : "已获取最新提交";
+    summary.textContent = data.latestDate ? ("GitHub main 最新提交: "+new Date(data.latestDate).toLocaleString()) : stateText;
+    info.innerHTML =
+      '<span class="badge">当前 '+escapeHtml(data.version || "")+'</span>'+
+      '<span class="badge">'+escapeHtml(stateText)+'</span>'+
+      '<a class="badge" href="'+escapeAttr(data.latestUrl || data.repo || "#")+'" target="_blank" rel="noopener noreferrer">'+escapeHtml(data.latestShortSha || "GitHub")+'</a>';
+  } catch(e) {
+    versionState = null;
+    summary.textContent = "版本检查暂时不可用。";
+    info.innerHTML = '<span class="badge">当前 '+escapeHtml(envState.version || "${VERSION}")+'</span><span class="badge">'+escapeHtml(e.message)+'</span>';
+  }
 }
 async function loadStats(){
   const grid = $("statsGrid");
