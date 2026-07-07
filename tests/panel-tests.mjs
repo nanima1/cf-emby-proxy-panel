@@ -142,6 +142,9 @@ function createDbMock() {
           db.prepared.push(this);
           return this;
         },
+        async run() {
+          return { success: true };
+        },
       };
       return statement;
     },
@@ -173,7 +176,15 @@ async function testImportRoutesValidation() {
     new Request("https://panel.test/api/routes/import", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ routes: [{ prefix: "ok", target: "https://a.example.com/, http://b.example.com:8096/" }] }),
+      body: JSON.stringify({
+        routes: [{
+          prefix: "ok",
+          target: "https://a.example.com/, http://b.example.com:8096/",
+          mode: "REAL-IP",
+          cacheImages: "false",
+          accessPolicy: { browserMode: "BLOCK" },
+        }],
+      }),
     }),
     { DB: validDb },
     {},
@@ -182,6 +193,9 @@ async function testImportRoutesValidation() {
   assert.equal((await valid.json()).imported, 1);
   assert.equal(validDb.batchCalls.length, 1);
   assert.equal(validDb.prepared.at(-1).values[1], "https://a.example.com\nhttp://b.example.com:8096");
+  assert.equal(validDb.prepared.at(-1).values[2], "real-ip");
+  assert.equal(validDb.prepared.at(-1).values[5], 0);
+  assert.equal(JSON.parse(validDb.prepared.at(-1).values[7]).browserMode, "block");
 }
 
 async function testInvalidJsonReturnsBadRequest() {
@@ -196,6 +210,14 @@ async function testInvalidJsonReturnsBadRequest() {
   );
   assert.equal(response.status, 400);
   assert.match((await response.json()).error, /JSON 格式不正确/);
+}
+
+async function testEnvBrowserModeNormalization() {
+  const upper = await worker.fetch(new Request("https://panel.test/api/env"), { BROWSER_MODE: "BLOCK" }, {});
+  assert.equal((await upper.json()).browserMode, "block");
+
+  const invalid = await worker.fetch(new Request("https://panel.test/api/env"), { BROWSER_MODE: "surprise" }, {});
+  assert.equal((await invalid.json()).browserMode, "proxy");
 }
 
 function testMarkdownLinks() {
@@ -222,5 +244,6 @@ await testPanelScriptAndRouteHelpers();
 await testInvalidRouteReturnsBadRequest();
 await testImportRoutesValidation();
 await testInvalidJsonReturnsBadRequest();
+await testEnvBrowserModeNormalization();
 testMarkdownLinks();
 console.log("PANEL_TESTS_OK");

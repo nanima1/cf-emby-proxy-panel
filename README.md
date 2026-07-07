@@ -143,6 +143,14 @@ D1_EXEC_ERROR: Error in line 1: CREATE TABLE IF NOT EXISTS routes (: incomplete 
 - `schema.sql` 必须完整执行。
 - 面板顶部 `部署自检` 里 `D1 binding` 和 `D1 tables` 应该通过。
 
+### 导入配置失败
+
+导入 JSON 会逐条校验。看到 `第 1 条路径无效` 这类提示时，优先检查：
+
+- `prefix` 只能用字母、数字、下划线、短横线。
+- `target` 必须是 `http://` 或 `https://` 开头的 Emby 上游。
+- 多个上游用逗号或换行分隔。
+
 ## 🛡️ 安全建议
 
 - 一定设置 `ADMIN_TOKEN`。

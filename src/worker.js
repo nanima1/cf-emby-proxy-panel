@@ -20,6 +20,8 @@ const COOKIE_NAME = "emby_panel_auth";
 const SESSION_TTL = 60 * 60 * 24 * 7;
 const DEFAULT_MODE = "clean";
 const DEFAULT_BROWSER_MODE = "proxy";
+const ALLOWED_MODES = ["clean", "real-ip", "origin", "direct"];
+const ALLOWED_BROWSER_MODES = ["proxy", "status", "block"];
 const APPEARANCE_SETTING_KEY = "appearance";
 const DEFAULT_APPEARANCE = { backgroundUrl: "", backgroundOpacity: 28 };
 const IP_SOURCE_URLS = {
@@ -2213,15 +2215,41 @@ function normalizeRoute(input = {}) {
     oldPrefix: cleanPrefix(input.oldPrefix),
     prefix: cleanPrefix(input.prefix),
     target: String(input.target || "").trim(),
-    mode: input.mode || DEFAULT_MODE,
-    remark: input.remark || "",
-    icon: input.icon || "",
+    mode: normalizeMode(input.mode),
+    remark: String(input.remark || ""),
+    icon: String(input.icon || ""),
     last_play: input.last_play || "",
-    cacheImages: input.cacheImages === undefined ? input.cacheImages !== 0 : Boolean(input.cacheImages),
-    order_idx: input.order_idx || 0,
-    accessPolicy,
-    todayReqs: input.todayReqs || 0,
+    cacheImages: normalizeBoolean(input.cacheImages, true),
+    order_idx: Number.isFinite(Number(input.order_idx)) ? Number(input.order_idx) : 0,
+    accessPolicy: normalizeAccessPolicy(accessPolicy),
+    todayReqs: Number.isFinite(Number(input.todayReqs)) ? Number(input.todayReqs) : 0,
   };
+}
+
+function normalizeMode(value) {
+  const mode = String(value || DEFAULT_MODE).toLowerCase();
+  return ALLOWED_MODES.includes(mode) ? mode : DEFAULT_MODE;
+}
+
+function normalizeBrowserMode(value, fallback = DEFAULT_BROWSER_MODE) {
+  const mode = String(value || fallback).toLowerCase();
+  return ALLOWED_BROWSER_MODES.includes(mode) ? mode : fallback;
+}
+
+function normalizeBoolean(value, fallback = true) {
+  if (value === undefined || value === null || value === "") return fallback;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  const text = String(value).trim().toLowerCase();
+  if (["0", "false", "off", "no", "否", "关", "关闭"].includes(text)) return false;
+  if (["1", "true", "on", "yes", "是", "开", "开启"].includes(text)) return true;
+  return fallback;
+}
+
+function normalizeAccessPolicy(value) {
+  const policy = value && typeof value === "object" && !Array.isArray(value) ? { ...value } : {};
+  policy.browserMode = normalizeBrowserMode(policy.browserMode);
+  return policy;
 }
 
 function validateRoute(route) {
@@ -2292,8 +2320,7 @@ function getAdminToken(env) {
 }
 
 function getEnvBrowserMode(env) {
-  const mode = String(env.BROWSER_MODE || DEFAULT_BROWSER_MODE).toLowerCase();
-  return ["proxy", "status", "block"].includes(mode) ? mode : DEFAULT_BROWSER_MODE;
+  return normalizeBrowserMode(env.BROWSER_MODE, DEFAULT_BROWSER_MODE);
 }
 
 async function measureDelay(target) {

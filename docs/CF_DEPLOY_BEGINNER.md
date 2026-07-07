@@ -670,6 +670,14 @@ npx wrangler d1 execute cf-emby-proxy-panel --remote --file=./schema.sql
 
 同名路径会覆盖，例如两个都是 `hk`，新导入的 `/hk` 会覆盖旧配置；不同名路径会新增。
 
+如果导入时报 `第 1 条路径无效`、`第 2 条路径无效`：
+
+- 说明 JSON 里对应那一条配置没有通过校验。
+- `prefix` 只能包含字母、数字、下划线、短横线。
+- `target` 必须是 `http://` 或 `https://` 开头的 Emby 上游。
+- 多个上游可以用逗号或换行分隔。
+- `mode`、`browserMode` 大小写写错时，面板会自动整理成支持的值。
+
 ## 常见问题 FAQ ❓
 
 ### 面板打开后提示 D1 未绑定
