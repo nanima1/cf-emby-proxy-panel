@@ -602,6 +602,8 @@ npx wrangler d1 execute cf-emby-proxy-panel --remote --file=./schema.sql
 - 面板保存不了路径：优先看 `D1 binding` 和 `D1 tables`，这两项必须是 `pass`。
 - 优选 IP 写入 DNS 失败：优先看 `DNS variables` 和 `Cloudflare DNS API`。
 
+如果你要找别人帮忙排错，先点 `复制报告`。它会复制版本号、D1/DNS 状态、检查结果和建议动作，不会复制 Cloudflare Token 或面板密码。
+
 ## 路由配置怎么备份和恢复
 
 建议在下面几种情况先点一次 `导出配置`：

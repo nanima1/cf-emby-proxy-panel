@@ -987,7 +987,10 @@ function panelPage(env) {
         <strong>部署自检</strong>
         <p class="small muted" id="doctorSummary">正在检查 D1、DNS、默认上游和安全设置。</p>
       </div>
-      <button class="btn" onclick="loadDoctor()">重新检查</button>
+      <div class="toolbar" style="margin:0">
+        <button class="btn" onclick="copyDoctorReport()">复制报告</button>
+        <button class="btn" onclick="loadDoctor()">重新检查</button>
+      </div>
     </div>
     <div id="doctorList" class="doctor-list"></div>
   </section>
@@ -1069,6 +1072,7 @@ function panelPage(env) {
 let routes = [];
 let ips = [];
 let envState = {};
+let doctorState = null;
 let wizardDismissed = false;
 const $ = (id) => document.getElementById(id);
 function toast(msg){ const el=$("toast"); el.textContent=msg; el.classList.add("show"); setTimeout(()=>el.classList.remove("show"),2600); }
@@ -1087,8 +1091,10 @@ async function loadDoctor(){
   if(summary) summary.textContent = "正在检查 D1、DNS、默认上游和安全设置。";
   try {
     const data = await api("/api/doctor");
+    doctorState = data;
     renderDoctor(data);
   } catch(e) {
+    doctorState = null;
     if(summary) summary.textContent = "自检接口调用失败。";
     list.innerHTML = '<div class="doctor-item fail"><div class="doctor-level">fail</div><div class="doctor-message"><strong>Doctor API</strong><br>'+escapeHtml(e.message)+'</div></div>';
   }
@@ -1106,6 +1112,33 @@ function renderDoctor(data){
 function doctorItem(item){
   const status = ["pass","warn","fail","info"].includes(item.status) ? item.status : "info";
   return '<div class="doctor-item '+status+'"><div class="doctor-level">'+status+'</div><div class="doctor-message"><strong>'+escapeHtml(item.label || item.id || "Check")+'</strong><br>'+escapeHtml(item.message || "")+(item.action ? '<div class="doctor-action">'+escapeHtml(item.action)+'</div>' : '')+'</div></div>';
+}
+async function copyDoctorReport(){
+  if(!doctorState) await loadDoctor();
+  if(!doctorState) return toast("没有可复制的诊断报告");
+  await navigator.clipboard.writeText(buildDoctorReport(doctorState));
+  toast("诊断报告已复制");
+}
+function buildDoctorReport(data){
+  const checks = Array.isArray(data.checks) ? data.checks : [];
+  const lines = [
+    "CF Emby Proxy Panel Doctor Report",
+    "Generated: "+new Date().toISOString(),
+    "Page: "+location.origin,
+    "Version: "+(data.version || ""),
+    "Ready: "+(data.ready ? "yes" : "no"),
+    "CheckedAt: "+(data.checkedAt || ""),
+    "D1 binding: "+(envState.hasDb ? "yes" : "no"),
+    "DNS env: "+(envState.hasDnsEnv ? "yes" : "no"),
+    "Route count: "+routes.length,
+    "",
+    "Checks:",
+  ];
+  for (const item of checks) {
+    lines.push("- ["+(item.status || "info").toUpperCase()+"] "+(item.label || item.id || "Check")+": "+(item.message || ""));
+    if(item.action) lines.push("  action: "+item.action);
+  }
+  return lines.join("\\n");
 }
 async function boot(){
   envState = await api("/api/env");
