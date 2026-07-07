@@ -1417,18 +1417,19 @@ function routeTargets(route){
   return String(route.target || "").split(",").map(x => x.trim()).filter(Boolean);
 }
 function normalizeBeginnerPrefix(value){
-  const cleaned = String(value || "emby").trim().replace(/^\/+/, "").replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 64);
+  const cleaned = String(value || "emby").trim().replace(new RegExp("^/+"), "").replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 64);
   return cleaned || "emby";
 }
 function normalizeBeginnerTarget(value){
   let input = String(value || "").trim();
   if(!input) throw new Error("先填写 Emby 原地址");
-  if(!/^https?:\/\//i.test(input)) input = "https://" + input;
+  if(!new RegExp("^https?://", "i").test(input)) input = "https://" + input;
   const url = new URL(input);
   url.hash = "";
   url.search = "";
   if(url.pathname === "/web" || url.pathname.startsWith("/web/")) url.pathname = "/";
-  return url.toString().replace(/\/$/, "");
+  const normalized = url.toString();
+  return normalized.endsWith("/") ? normalized.slice(0, -1) : normalized;
 }
 function updateQuickProxyUrl(prefixValue){
   const input = $("quickPrefix");
