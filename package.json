@@ -9,7 +9,7 @@
     "dry-run": "wrangler deploy --dry-run",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "d1:init": "wrangler d1 execute cf-emby-proxy-panel --file=./schema.sql"
+    "d1:init": "wrangler d1 execute cf-emby-proxy-panel --remote --file=./schema.sql"
   },
   "devDependencies": {
     "wrangler": "^4.107.0"

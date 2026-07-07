@@ -144,6 +144,10 @@ async function handleApi(request, env, ctx) {
     });
   }
 
+  if (url.pathname === "/api/doctor") {
+    return handleDoctorApi(env);
+  }
+
   if (url.pathname === "/api/routes") {
     return handleRoutesApi(request, env);
   }
@@ -182,6 +186,102 @@ async function handleApi(request, env, ctx) {
   }
 
   return json({ success: false, error: "API not found" }, 404);
+}
+
+async function handleDoctorApi(env) {
+  const checks = [];
+  const add = (id, label, status, message, action = "") => {
+    checks.push({ id, label, status, message, action });
+  };
+
+  if (getAdminToken(env)) {
+    add("adminToken", "ADMIN_TOKEN", "pass", "Panel login is protected.");
+  } else {
+    add("adminToken", "ADMIN_TOKEN", "warn", "Panel is open because ADMIN_TOKEN is not set.", "Set ADMIN_TOKEN as a Worker secret.");
+  }
+
+  if (!env.DB) {
+    add("dbBinding", "D1 binding", "fail", "D1 binding named DB is missing.", "Bind your D1 database to this Worker with variable name DB.");
+  } else {
+    add("dbBinding", "D1 binding", "pass", "D1 binding DB is available.");
+    try {
+      await ensureSchema(env.DB);
+      const routeCount = await env.DB.prepare("SELECT COUNT(*) AS count FROM routes").first();
+      const statCount = await env.DB.prepare("SELECT COUNT(*) AS count FROM request_stats").first();
+      add(
+        "dbSchema",
+        "D1 tables",
+        "pass",
+        `routes: ${Number(routeCount?.count || 0)}, request_stats: ${Number(statCount?.count || 0)}.`,
+      );
+    } catch (error) {
+      add(
+        "dbSchema",
+        "D1 tables",
+        "fail",
+        error.message || "D1 schema check failed.",
+        "Run: npx wrangler d1 execute cf-emby-proxy-panel --remote --file=./schema.sql",
+      );
+    }
+  }
+
+  const missingDnsVars = ["CF_API_TOKEN", "CF_ZONE_ID", "CF_DOMAIN"].filter((name) => !env[name]);
+  if (missingDnsVars.length) {
+    add(
+      "dnsVars",
+      "DNS variables",
+      "warn",
+      `DNS automation is disabled. Missing: ${missingDnsVars.join(", ")}.`,
+      "Set these variables only if you want the panel to write Cloudflare DNS records.",
+    );
+  } else {
+    add("dnsVars", "DNS variables", "pass", `DNS automation target: ${env.CF_DOMAIN}.`);
+    try {
+      const response = await cfApi(env, `/zones/${env.CF_ZONE_ID}/dns_records?name=${encodeURIComponent(env.CF_DOMAIN)}&per_page=1`);
+      const data = await response.json();
+      if (response.ok && data.success) {
+        add("dnsApi", "Cloudflare DNS API", "pass", `Cloudflare API is reachable. Existing records found: ${(data.result || []).length}.`);
+      } else {
+        add(
+          "dnsApi",
+          "Cloudflare DNS API",
+          "fail",
+          "Cloudflare rejected the DNS API check.",
+          "Check CF_API_TOKEN permission, CF_ZONE_ID, and CF_DOMAIN.",
+        );
+      }
+    } catch (error) {
+      add(
+        "dnsApi",
+        "Cloudflare DNS API",
+        "fail",
+        error.message || "Could not reach Cloudflare API.",
+        "Check whether the token and zone settings are correct.",
+      );
+    }
+  }
+
+  const defaultTarget = splitTargets(env.DEFAULT_TARGET || "")[0];
+  if (!defaultTarget) {
+    add("defaultTarget", "DEFAULT_TARGET", "info", "No default upstream is set. This is fine if you only use /path routes.");
+  } else {
+    const ms = await measureDelay(defaultTarget);
+    add(
+      "defaultTarget",
+      "DEFAULT_TARGET",
+      ms >= 0 ? "pass" : "warn",
+      ms >= 0 ? `Default upstream responded in ${ms} ms.` : "Default upstream did not respond to the quick HEAD check.",
+      "If routes work normally, this warning can be ignored.",
+    );
+  }
+
+  return json({
+    success: true,
+    ready: !checks.some((check) => check.status === "fail"),
+    version: VERSION,
+    checkedAt: new Date().toISOString(),
+    checks,
+  });
 }
 
 async function handleRoutesApi(request, env) {
@@ -800,7 +900,7 @@ function panelPage(env) {
 <title>Emby Proxy Panel</title>
 <style>
 :root{--bg:#f6f7f4;--panel:#fffdf7;--ink:#202124;--muted:#68706a;--line:#d9ded4;--blue:#2563eb;--green:#14804a;--red:#d12b2b;--orange:#c26a16;--shadow:0 18px 45px rgba(30,42,35,.08)}
-*{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#f7f8f2 0,#edf5f2 42%,#f8f1e5 100%);color:var(--ink);font-family:"Segoe UI","Microsoft YaHei",sans-serif}.wrap{max-width:1280px;margin:0 auto;padding:24px}.top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:20px}.title h1{margin:0;font-size:28px}.title p{margin:6px 0 0;color:var(--muted)}.grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(360px,.8fr);gap:18px}.card{background:rgba(255,253,247,.9);border:1px solid var(--line);box-shadow:var(--shadow);border-radius:8px;padding:18px}.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}.btn{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:7px;padding:10px 13px;font-weight:700;cursor:pointer}.btn:hover{border-color:#8b9b8e}.primary{background:var(--blue);color:#fff;border-color:var(--blue)}.danger{color:var(--red);border-color:#f1b4b4}.green{color:var(--green);border-color:#a6d5bb}.muted{color:var(--muted)}input,select,textarea{width:100%;border:1px solid var(--line);border-radius:7px;background:#fff;padding:10px 12px;font:inherit}textarea{min-height:76px;resize:vertical}.field{margin-bottom:12px}.field label{display:block;font-size:13px;font-weight:700;color:var(--muted);margin-bottom:6px}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.routes{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px}.route{border:1px solid var(--line);border-radius:8px;background:#fff;padding:14px;display:flex;flex-direction:column;gap:11px}.route-head{display:flex;justify-content:space-between;gap:10px}.prefix{font-size:20px;font-weight:800}.badge{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:999px;padding:3px 8px;font-size:12px;color:var(--muted);background:#fafafa}.target{font-family:Consolas,monospace;font-size:12px;word-break:break-all;color:#335}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}.ip-list{display:grid;gap:8px;max-height:280px;overflow:auto}.ip-item{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;border:1px solid var(--line);border-radius:7px;padding:9px;background:#fff}.ip-item code{font-size:13px}.toast{position:fixed;left:50%;top:-80px;transform:translateX(-50%);background:#202124;color:#fff;border-radius:999px;padding:12px 18px;transition:.25s;z-index:10}.toast.show{top:18px}.empty{border:1px dashed var(--line);border-radius:8px;padding:26px;text-align:center;color:var(--muted)}.footer{margin-top:18px;color:var(--muted);font-size:13px}.split{display:flex;align-items:center;justify-content:space-between;gap:12px}.switch{display:flex;gap:8px;align-items:center}.switch input{width:auto}.small{font-size:12px}.status-line{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#f7f8f2 0,#edf5f2 42%,#f8f1e5 100%);color:var(--ink);font-family:"Segoe UI","Microsoft YaHei",sans-serif}.wrap{max-width:1280px;margin:0 auto;padding:24px}.top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:20px}.title h1{margin:0;font-size:28px}.title p{margin:6px 0 0;color:var(--muted)}.grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(360px,.8fr);gap:18px}.card{background:rgba(255,253,247,.9);border:1px solid var(--line);box-shadow:var(--shadow);border-radius:8px;padding:18px}.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}.btn{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:7px;padding:10px 13px;font-weight:700;cursor:pointer}.btn:hover{border-color:#8b9b8e}.primary{background:var(--blue);color:#fff;border-color:var(--blue)}.danger{color:var(--red);border-color:#f1b4b4}.green{color:var(--green);border-color:#a6d5bb}.muted{color:var(--muted)}input,select,textarea{width:100%;border:1px solid var(--line);border-radius:7px;background:#fff;padding:10px 12px;font:inherit}textarea{min-height:76px;resize:vertical}.field{margin-bottom:12px}.field label{display:block;font-size:13px;font-weight:700;color:var(--muted);margin-bottom:6px}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.routes{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px}.route{border:1px solid var(--line);border-radius:8px;background:#fff;padding:14px;display:flex;flex-direction:column;gap:11px}.route-head{display:flex;justify-content:space-between;gap:10px}.prefix{font-size:20px;font-weight:800}.badge{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:999px;padding:3px 8px;font-size:12px;color:var(--muted);background:#fafafa}.target{font-family:Consolas,monospace;font-size:12px;word-break:break-all;color:#335}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}.ip-list{display:grid;gap:8px;max-height:280px;overflow:auto}.ip-item{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;border:1px solid var(--line);border-radius:7px;padding:9px;background:#fff}.ip-item code{font-size:13px}.toast{position:fixed;left:50%;top:-80px;transform:translateX(-50%);background:#202124;color:#fff;border-radius:999px;padding:12px 18px;transition:.25s;z-index:10}.toast.show{top:18px}.empty{border:1px dashed var(--line);border-radius:8px;padding:26px;text-align:center;color:var(--muted)}.footer{margin-top:18px;color:var(--muted);font-size:13px}.split{display:flex;align-items:center;justify-content:space-between;gap:12px}.switch{display:flex;gap:8px;align-items:center}.switch input{width:auto}.small{font-size:12px}.status-line{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.doctor{margin-bottom:18px}.doctor-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-top:12px}.doctor-item{min-width:0;border:1px solid var(--line);border-radius:8px;background:#fff;padding:11px;display:grid;grid-template-columns:70px 1fr;gap:10px;align-items:start}.doctor-item.pass{border-color:#a6d5bb}.doctor-item.warn,.doctor-item.info{border-color:#efd0a8}.doctor-item.fail{border-color:#f1b4b4}.doctor-level{font-weight:800;font-size:12px;text-transform:uppercase}.doctor-item.pass .doctor-level{color:var(--green)}.doctor-item.warn .doctor-level{color:var(--orange)}.doctor-item.info .doctor-level{color:var(--muted)}.doctor-item.fail .doctor-level{color:var(--red)}.doctor-message{overflow-wrap:anywhere}.doctor-action{margin-top:4px;color:var(--muted);font-size:12px;overflow-wrap:anywhere}
 @media(max-width:900px){.grid{grid-template-columns:1fr}.wrap{padding:14px}.top{flex-direction:column}.row{grid-template-columns:1fr}.routes{grid-template-columns:1fr}}
 </style>
 </head>
@@ -818,6 +918,16 @@ function panelPage(env) {
       </div>
     </div>
     <button class="btn" onclick="logout()">退出登录</button>
+  </section>
+  <section class="card doctor" id="doctorCard">
+    <div class="split">
+      <div>
+        <strong>部署自检</strong>
+        <p class="small muted" id="doctorSummary">正在检查 D1、DNS、默认上游和安全设置。</p>
+      </div>
+      <button class="btn" onclick="loadDoctor()">重新检查</button>
+    </div>
+    <div id="doctorList" class="doctor-list"></div>
   </section>
   <section class="grid">
     <div class="card">
@@ -877,10 +987,39 @@ async function api(path, init={}){
   if(!res.ok) throw new Error(data.error || data.message || data);
   return data;
 }
+async function loadDoctor(){
+  const list = $("doctorList");
+  const summary = $("doctorSummary");
+  if(!list) return;
+  list.innerHTML = '<div class="empty">正在检查部署状态...</div>';
+  if(summary) summary.textContent = "正在检查 D1、DNS、默认上游和安全设置。";
+  try {
+    const data = await api("/api/doctor");
+    renderDoctor(data);
+  } catch(e) {
+    if(summary) summary.textContent = "自检接口调用失败。";
+    list.innerHTML = '<div class="doctor-item fail"><div class="doctor-level">fail</div><div class="doctor-message"><strong>Doctor API</strong><br>'+escapeHtml(e.message)+'</div></div>';
+  }
+}
+function renderDoctor(data){
+  const checks = Array.isArray(data.checks) ? data.checks : [];
+  const fail = checks.filter(x => x.status === "fail").length;
+  const warn = checks.filter(x => x.status === "warn").length;
+  const summary = $("doctorSummary");
+  if(summary) {
+    summary.textContent = fail ? ("发现 "+fail+" 个必须处理的问题。") : warn ? ("核心配置可用，还有 "+warn+" 个建议项。") : "核心配置看起来正常。";
+  }
+  $("doctorList").innerHTML = checks.length ? checks.map(doctorItem).join("") : '<div class="empty">没有返回检查结果。</div>';
+}
+function doctorItem(item){
+  const status = ["pass","warn","fail","info"].includes(item.status) ? item.status : "info";
+  return '<div class="doctor-item '+status+'"><div class="doctor-level">'+status+'</div><div class="doctor-message"><strong>'+escapeHtml(item.label || item.id || "Check")+'</strong><br>'+escapeHtml(item.message || "")+(item.action ? '<div class="doctor-action">'+escapeHtml(item.action)+'</div>' : '')+'</div></div>';
+}
 async function boot(){
   const env = await api("/api/env");
   $("dbBadge").textContent = env.hasDb ? "D1 已绑定" : "D1 未绑定";
   $("dnsBadge").textContent = env.hasDnsEnv ? "DNS 已配置: " + env.cfDomain : "DNS 未配置";
+  await loadDoctor();
   await loadRoutes();
 }
 async function loadRoutes(){

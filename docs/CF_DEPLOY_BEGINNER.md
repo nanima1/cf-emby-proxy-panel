@@ -567,6 +567,30 @@ npx wrangler d1 execute cf-emby-proxy-panel --remote --file=./schema.sql
 
 如果你用网页 SQL 控制台，就粘贴 B-5 里的完整 SQL。
 
+## 部署后先看“部署自检”
+
+打开 Worker 面板并登录后，页面顶部会看到 `部署自检` 卡片。它会自动检查几件最容易配错的事情：
+
+- `ADMIN_TOKEN`：有没有设置面板登录密码。
+- `D1 binding`：D1 是否绑定到 Worker，绑定名是不是 `DB`。
+- `D1 tables`：`routes` 和 `request_stats` 两张表是否能正常访问。
+- `DNS variables`：是否配置了 `CF_API_TOKEN`、`CF_ZONE_ID`、`CF_DOMAIN`。
+- `Cloudflare DNS API`：如果 DNS 变量都填了，会尝试访问 Cloudflare API。
+- `DEFAULT_TARGET`：如果设置了默认上游，会做一次快速连通性检查。
+
+怎么看结果：
+
+- `pass`：这一项正常。
+- `warn`：不是必填项，或者当前不影响基本使用，但建议后面处理。
+- `fail`：必须处理。比如 D1 没绑定、D1 表访问失败、DNS Token 填错。
+- `info`：提示信息，不是错误。
+
+最常见的情况：
+
+- 只想先用 `/hk`、`/home` 这种路径反代 Emby：`DNS variables` 和 `DEFAULT_TARGET` 出现 `warn/info` 可以先不管。
+- 面板保存不了路径：优先看 `D1 binding` 和 `D1 tables`，这两项必须是 `pass`。
+- 优选 IP 写入 DNS 失败：优先看 `DNS variables` 和 `Cloudflare DNS API`。
+
 ## 常见问题
 
 ### 面板打开后提示 D1 未绑定
