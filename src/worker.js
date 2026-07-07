@@ -1022,6 +1022,7 @@ function panelPage(env) {
       <div class="toolbar">
         <button class="btn primary" onclick="newRoute()">新增路径</button>
         <button class="btn" onclick="loadRoutes()">刷新</button>
+        <button class="btn" onclick="pingAllRoutes()">测试全部</button>
         <button class="btn" onclick="exportRoutes()">导出配置</button>
         <button class="btn" onclick="pickImportFile()">导入配置</button>
         <input id="importFile" type="file" accept="application/json,.json" onchange="importRoutesFile(event)" hidden>
@@ -1073,6 +1074,7 @@ let routes = [];
 let ips = [];
 let envState = {};
 let doctorState = null;
+let routeHealth = {};
 let wizardDismissed = false;
 const $ = (id) => document.getElementById(id);
 function toast(msg){ const el=$("toast"); el.textContent=msg; el.classList.add("show"); setTimeout(()=>el.classList.remove("show"),2600); }
@@ -1188,9 +1190,19 @@ async function saveWizardRoute(e){
   await loadRoutes();
 }
 function routeCard(r){
-  const targets = (r.target || "").split(",").filter(Boolean).length;
+  const targets = routeTargets(r).length;
   const url = location.origin + "/" + r.prefix;
-  return '<article class="route"><div class="route-head"><div><div class="prefix">'+escapeHtml(r.icon || "🎞️")+" /"+escapeHtml(r.prefix)+'</div><div class="muted small">'+escapeHtml(r.remark || "无备注")+'</div></div><span class="badge">'+escapeHtml(r.mode || "clean")+'</span></div><div class="target">'+escapeHtml(r.target)+'</div><div class="status-line"><span class="badge">'+targets+' 个上游</span><span class="badge">今日播放 '+(r.todayReqs||0)+'</span><span class="badge">'+(r.cacheImages ? "缓存开" : "缓存关")+'</span></div><div class="actions"><button class="btn" onclick="copyText(\\''+url+'\\')">复制入口</button><button class="btn" onclick="pingRoute(\\''+escapeAttr(r.prefix)+'\\')">测速</button><button class="btn" onclick="editRoute(\\''+escapeAttr(r.prefix)+'\\')">编辑</button><button class="btn danger" onclick="deleteRoute(\\''+escapeAttr(r.prefix)+'\\')">删除</button></div></article>';
+  return '<article class="route"><div class="route-head"><div><div class="prefix">'+escapeHtml(r.icon || "🎞️")+" /"+escapeHtml(r.prefix)+'</div><div class="muted small">'+escapeHtml(r.remark || "无备注")+'</div></div><span class="badge">'+escapeHtml(r.mode || "clean")+'</span></div><div class="target">'+escapeHtml(r.target)+'</div><div class="status-line"><span class="badge">'+targets+' 个上游</span>'+routeHealthBadge(r.prefix)+'<span class="badge">今日播放 '+(r.todayReqs||0)+'</span><span class="badge">'+(r.cacheImages ? "缓存开" : "缓存关")+'</span></div><div class="actions"><button class="btn" onclick="copyText(\\''+url+'\\')">复制入口</button><button class="btn" onclick="pingRoute(\\''+escapeAttr(r.prefix)+'\\')">测速</button><button class="btn" onclick="editRoute(\\''+escapeAttr(r.prefix)+'\\')">编辑</button><button class="btn danger" onclick="deleteRoute(\\''+escapeAttr(r.prefix)+'\\')">删除</button></div></article>';
+}
+function routeTargets(route){
+  return String(route.target || "").split(",").map(x => x.trim()).filter(Boolean);
+}
+function routeHealthBadge(prefix){
+  const item = routeHealth[prefix];
+  if(!item) return "";
+  if(item.loading) return '<span class="badge">测试中</span>';
+  const best = item.best >= 0 ? item.best+" ms" : "全部失败";
+  return '<span class="badge">'+item.ok+'/'+item.total+' 可用 · '+best+'</span>';
 }
 function exportRoutes(){
   if(!routes.length) return toast("还没有可导出的路径");
@@ -1254,9 +1266,42 @@ async function saveRoute(e){
 async function deleteRoute(prefix){ if(!confirm("删除 /"+prefix+" ?")) return; await api("/api/routes?prefix="+encodeURIComponent(prefix), { method:"DELETE" }); toast("已删除"); await loadRoutes(); }
 async function pingRoute(prefix){
   const r = routes.find(x => x.prefix === prefix); if(!r) return;
-  const first = (r.target || "").split(",")[0].trim();
-  const data = await api("/api/ping?url="+encodeURIComponent(first));
-  toast("/"+prefix+" 延迟: "+(data.ms >= 0 ? data.ms+" ms" : "失败"));
+  await pingOneRoute(r, true);
+}
+async function pingAllRoutes(){
+  if(!routes.length) return toast("还没有路径");
+  toast("开始测试全部上游");
+  for (const route of routes) {
+    await pingOneRoute(route, false);
+  }
+  toast("全部上游测试完成");
+}
+async function pingOneRoute(route, showToast){
+  const targets = routeTargets(route);
+  if(!targets.length) return;
+  routeHealth[route.prefix] = { loading:true, total:targets.length, ok:0, best:-1 };
+  renderRoutes();
+  const results = [];
+  for (const target of targets) {
+    try {
+      const data = await api("/api/ping?url="+encodeURIComponent(target));
+      results.push(Number(data.ms));
+    } catch {
+      results.push(-1);
+    }
+  }
+  const okResults = results.filter(ms => ms >= 0);
+  routeHealth[route.prefix] = {
+    loading:false,
+    total:targets.length,
+    ok:okResults.length,
+    best:okResults.length ? Math.min(...okResults) : -1,
+  };
+  renderRoutes();
+  if(showToast) {
+    const item = routeHealth[route.prefix];
+    toast("/"+route.prefix+" 上游: "+item.ok+"/"+item.total+" 可用，最快 "+(item.best >= 0 ? item.best+" ms" : "失败"));
+  }
 }
 async function loadRemoteIps(){ const data = await api("/api/get-remote-ips?type="+encodeURIComponent($("ipType").value)); setIps(data.ips || []); toast("已拉取 "+(data.totalCount||0)+" 条"); }
 async function loadCustomIps(){ const src=$("ipSource").value.trim(); if(!src) return toast("先填自定义源 URL"); const data=await api("/api/fetch-ips?url="+encodeURIComponent(src)); setIps(data.ips || []); toast("已解析 "+(data.totalCount||0)+" 条"); }
