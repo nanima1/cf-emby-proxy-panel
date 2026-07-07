@@ -900,8 +900,9 @@ function panelPage(env) {
 <title>Emby Proxy Panel</title>
 <style>
 :root{--bg:#f6f7f4;--panel:#fffdf7;--ink:#202124;--muted:#68706a;--line:#d9ded4;--blue:#2563eb;--green:#14804a;--red:#d12b2b;--orange:#c26a16;--shadow:0 18px 45px rgba(30,42,35,.08)}
-*{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#f7f8f2 0,#edf5f2 42%,#f8f1e5 100%);color:var(--ink);font-family:"Segoe UI","Microsoft YaHei",sans-serif}.wrap{max-width:1280px;margin:0 auto;padding:24px}.top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:20px}.title h1{margin:0;font-size:28px}.title p{margin:6px 0 0;color:var(--muted)}.grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(360px,.8fr);gap:18px}.card{background:rgba(255,253,247,.9);border:1px solid var(--line);box-shadow:var(--shadow);border-radius:8px;padding:18px}.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}.btn{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:7px;padding:10px 13px;font-weight:700;cursor:pointer}.btn:hover{border-color:#8b9b8e}.primary{background:var(--blue);color:#fff;border-color:var(--blue)}.danger{color:var(--red);border-color:#f1b4b4}.green{color:var(--green);border-color:#a6d5bb}.muted{color:var(--muted)}input,select,textarea{width:100%;border:1px solid var(--line);border-radius:7px;background:#fff;padding:10px 12px;font:inherit}textarea{min-height:76px;resize:vertical}.field{margin-bottom:12px}.field label{display:block;font-size:13px;font-weight:700;color:var(--muted);margin-bottom:6px}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.routes{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px}.route{border:1px solid var(--line);border-radius:8px;background:#fff;padding:14px;display:flex;flex-direction:column;gap:11px}.route-head{display:flex;justify-content:space-between;gap:10px}.prefix{font-size:20px;font-weight:800}.badge{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:999px;padding:3px 8px;font-size:12px;color:var(--muted);background:#fafafa}.target{font-family:Consolas,monospace;font-size:12px;word-break:break-all;color:#335}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}.ip-list{display:grid;gap:8px;max-height:280px;overflow:auto}.ip-item{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;border:1px solid var(--line);border-radius:7px;padding:9px;background:#fff}.ip-item code{font-size:13px}.toast{position:fixed;left:50%;top:-80px;transform:translateX(-50%);background:#202124;color:#fff;border-radius:999px;padding:12px 18px;transition:.25s;z-index:10}.toast.show{top:18px}.empty{border:1px dashed var(--line);border-radius:8px;padding:26px;text-align:center;color:var(--muted)}.footer{margin-top:18px;color:var(--muted);font-size:13px}.split{display:flex;align-items:center;justify-content:space-between;gap:12px}.switch{display:flex;gap:8px;align-items:center}.switch input{width:auto}.small{font-size:12px}.status-line{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.doctor{margin-bottom:18px}.doctor-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-top:12px}.doctor-item{min-width:0;border:1px solid var(--line);border-radius:8px;background:#fff;padding:11px;display:grid;grid-template-columns:70px 1fr;gap:10px;align-items:start}.doctor-item.pass{border-color:#a6d5bb}.doctor-item.warn,.doctor-item.info{border-color:#efd0a8}.doctor-item.fail{border-color:#f1b4b4}.doctor-level{font-weight:800;font-size:12px;text-transform:uppercase}.doctor-item.pass .doctor-level{color:var(--green)}.doctor-item.warn .doctor-level{color:var(--orange)}.doctor-item.info .doctor-level{color:var(--muted)}.doctor-item.fail .doctor-level{color:var(--red)}.doctor-message{overflow-wrap:anywhere}.doctor-action{margin-top:4px;color:var(--muted);font-size:12px;overflow-wrap:anywhere}
-@media(max-width:900px){.grid{grid-template-columns:1fr}.wrap{padding:14px}.top{flex-direction:column}.row{grid-template-columns:1fr}.routes{grid-template-columns:1fr}}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#f7f8f2 0,#edf5f2 42%,#f8f1e5 100%);color:var(--ink);font-family:"Segoe UI","Microsoft YaHei",sans-serif}.wrap{max-width:1280px;margin:0 auto;padding:24px}.top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:20px}.title h1{margin:0;font-size:28px}.title p{margin:6px 0 0;color:var(--muted)}.grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(360px,.8fr);gap:18px}.card{background:rgba(255,253,247,.9);border:1px solid var(--line);box-shadow:var(--shadow);border-radius:8px;padding:18px}.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}.btn{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:7px;padding:10px 13px;font-weight:700;cursor:pointer}.btn:hover{border-color:#8b9b8e}.btn:disabled{opacity:.55;cursor:not-allowed}.primary{background:var(--blue);color:#fff;border-color:var(--blue)}.danger{color:var(--red);border-color:#f1b4b4}.green{color:var(--green);border-color:#a6d5bb}.muted{color:var(--muted)}input,select,textarea{width:100%;border:1px solid var(--line);border-radius:7px;background:#fff;padding:10px 12px;font:inherit}textarea{min-height:76px;resize:vertical}.field{margin-bottom:12px}.field label{display:block;font-size:13px;font-weight:700;color:var(--muted);margin-bottom:6px}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.routes{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px}.route{border:1px solid var(--line);border-radius:8px;background:#fff;padding:14px;display:flex;flex-direction:column;gap:11px}.route-head{display:flex;justify-content:space-between;gap:10px}.prefix{font-size:20px;font-weight:800}.badge{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:999px;padding:3px 8px;font-size:12px;color:var(--muted);background:#fafafa}.target{font-family:Consolas,monospace;font-size:12px;word-break:break-all;color:#335}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}.ip-list{display:grid;gap:8px;max-height:280px;overflow:auto}.ip-item{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;border:1px solid var(--line);border-radius:7px;padding:9px;background:#fff}.ip-item code{font-size:13px}.toast{position:fixed;left:50%;top:-80px;transform:translateX(-50%);background:#202124;color:#fff;border-radius:999px;padding:12px 18px;transition:.25s;z-index:10}.toast.show{top:18px}.empty{border:1px dashed var(--line);border-radius:8px;padding:26px;text-align:center;color:var(--muted)}.footer{margin-top:18px;color:var(--muted);font-size:13px}.split{display:flex;align-items:center;justify-content:space-between;gap:12px}.switch{display:flex;gap:8px;align-items:center}.switch input{width:auto}.small{font-size:12px}.status-line{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.doctor{margin-bottom:18px}.doctor-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-top:12px}.doctor-item{min-width:0;border:1px solid var(--line);border-radius:8px;background:#fff;padding:11px;display:grid;grid-template-columns:70px 1fr;gap:10px;align-items:start}.doctor-item.pass{border-color:#a6d5bb}.doctor-item.warn,.doctor-item.info{border-color:#efd0a8}.doctor-item.fail{border-color:#f1b4b4}.doctor-level{font-weight:800;font-size:12px;text-transform:uppercase}.doctor-item.pass .doctor-level{color:var(--green)}.doctor-item.warn .doctor-level{color:var(--orange)}.doctor-item.info .doctor-level{color:var(--muted)}.doctor-item.fail .doctor-level{color:var(--red)}.doctor-message{overflow-wrap:anywhere}.doctor-action{margin-top:4px;color:var(--muted);font-size:12px;overflow-wrap:anywhere}.wizard{margin-bottom:18px}.wizard[hidden]{display:none}.wizard-grid{display:grid;grid-template-columns:minmax(260px,.8fr) minmax(320px,1.2fr);gap:14px;margin-top:12px}.wizard-steps{display:grid;gap:8px}.wizard-step{border:1px solid var(--line);border-radius:8px;background:#fff;padding:10px;display:flex;justify-content:space-between;gap:10px;align-items:center}.wizard-step strong{overflow-wrap:anywhere}.wizard-form{display:grid;gap:10px}.wizard-form .row{align-items:end}
+.wizard-step{display:grid;grid-template-columns:1fr auto;gap:6px 10px;justify-content:normal}
+@media(max-width:900px){.grid,.wizard-grid{grid-template-columns:1fr}.wrap{padding:14px}.top{flex-direction:column}.row{grid-template-columns:1fr}.routes{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -928,6 +929,29 @@ function panelPage(env) {
       <button class="btn" onclick="loadDoctor()">重新检查</button>
     </div>
     <div id="doctorList" class="doctor-list"></div>
+  </section>
+  <section class="card wizard" id="wizardCard" hidden>
+    <div class="split">
+      <div>
+        <strong>首次使用向导</strong>
+        <p class="small muted" id="wizardSummary">添加第一条 Emby 路由后，客户端就可以使用 /路径 访问。</p>
+      </div>
+      <button class="btn" onclick="dismissWizard()">稍后处理</button>
+    </div>
+    <div class="wizard-grid">
+      <div id="wizardSteps" class="wizard-steps"></div>
+      <form class="wizard-form" onsubmit="saveWizardRoute(event)">
+        <div class="row">
+          <div class="field"><label>入口路径</label><input id="wizardPrefix" value="emby" placeholder="emby"></div>
+          <div class="field"><label>模式</label><select id="wizardMode"><option value="clean">clean</option><option value="origin">origin</option><option value="real-ip">real-ip</option><option value="direct">direct</option></select></div>
+        </div>
+        <div class="field"><label>Emby 上游</label><input id="wizardTarget" placeholder="https://emby.example.com:443"></div>
+        <div class="split">
+          <span class="small muted" id="wizardHint">推荐先用 clean；前后端分离再试 origin。</span>
+          <button class="btn primary" id="wizardSave" type="submit">保存第一条路由</button>
+        </div>
+      </form>
+    </div>
   </section>
   <section class="grid">
     <div class="card">
@@ -978,6 +1002,8 @@ function panelPage(env) {
 <script>
 let routes = [];
 let ips = [];
+let envState = {};
+let wizardDismissed = false;
 const $ = (id) => document.getElementById(id);
 function toast(msg){ const el=$("toast"); el.textContent=msg; el.classList.add("show"); setTimeout(()=>el.classList.remove("show"),2600); }
 async function api(path, init={}){
@@ -1016,19 +1042,51 @@ function doctorItem(item){
   return '<div class="doctor-item '+status+'"><div class="doctor-level">'+status+'</div><div class="doctor-message"><strong>'+escapeHtml(item.label || item.id || "Check")+'</strong><br>'+escapeHtml(item.message || "")+(item.action ? '<div class="doctor-action">'+escapeHtml(item.action)+'</div>' : '')+'</div></div>';
 }
 async function boot(){
-  const env = await api("/api/env");
-  $("dbBadge").textContent = env.hasDb ? "D1 已绑定" : "D1 未绑定";
-  $("dnsBadge").textContent = env.hasDnsEnv ? "DNS 已配置: " + env.cfDomain : "DNS 未配置";
+  envState = await api("/api/env");
+  $("dbBadge").textContent = envState.hasDb ? "D1 已绑定" : "D1 未绑定";
+  $("dnsBadge").textContent = envState.hasDnsEnv ? "DNS 已配置: " + envState.cfDomain : "DNS 未配置";
   await loadDoctor();
   await loadRoutes();
 }
 async function loadRoutes(){
-  try { routes = await api("/api/routes"); renderRoutes(); } catch(e){ $("routes").innerHTML = '<div class="empty">'+e.message+'</div>'; }
+  try { routes = await api("/api/routes"); renderRoutes(); renderWizard(); } catch(e){ routes = []; $("routes").innerHTML = '<div class="empty">'+e.message+'</div>'; renderWizard(e.message); }
 }
 function renderRoutes(){
   const q = $("search").value.trim().toLowerCase();
   const list = routes.filter(r => !q || [r.prefix,r.target,r.remark,r.mode].join(" ").toLowerCase().includes(q));
   $("routes").innerHTML = list.length ? list.map(routeCard).join("") : '<div class="empty">还没有路径，先新增一个 /emby 或 /hk。</div>';
+}
+function renderWizard(errorMessage=""){
+  const card = $("wizardCard");
+  if(!card) return;
+  const shouldShow = !wizardDismissed && (Boolean(errorMessage) || routes.length === 0);
+  card.hidden = !shouldShow;
+  if(!shouldShow) return;
+  const dbOk = Boolean(envState.hasDb) && !errorMessage;
+  const steps = [
+    { label:"D1 数据库", status:dbOk ? "pass" : "fail", note:dbOk ? "DB 已就绪" : (errorMessage || "需要绑定 D1，变量名必须是 DB") },
+    { label:"第一条路由", status:routes.length ? "pass" : "warn", note:routes.length ? "已创建 "+routes.length+" 条" : "填写右侧表单保存" },
+    { label:"DNS 自动化", status:envState.hasDnsEnv ? "pass" : "info", note:envState.hasDnsEnv ? envState.cfDomain : "可选，不影响先添加路由" },
+  ];
+  $("wizardSteps").innerHTML = steps.map(wizardStep).join("");
+  $("wizardSummary").textContent = dbOk ? "添加第一条 Emby 路由后，客户端就可以使用 /路径 访问。" : "先处理 D1，再保存第一条路由。";
+  $("wizardSave").disabled = !dbOk;
+}
+function wizardStep(step){
+  return '<div class="wizard-step '+step.status+'"><strong>'+escapeHtml(step.label)+'</strong><span class="badge">'+escapeHtml(step.status)+'</span><div class="small muted" style="grid-column:1 / -1">'+escapeHtml(step.note)+'</div></div>';
+}
+function dismissWizard(){
+  wizardDismissed = true;
+  renderWizard();
+}
+async function saveWizardRoute(e){
+  e.preventDefault();
+  const prefix = $("wizardPrefix").value.trim() || "emby";
+  const target = $("wizardTarget").value.trim();
+  if(!target) return toast("先填写 Emby 上游地址");
+  await api("/api/routes", { method:"POST", body:JSON.stringify({ prefix, target, mode:$("wizardMode").value, remark:"首次向导", icon:"", cacheImages:true, accessPolicy:{ browserMode:"status" } }) });
+  toast("第一条路由已保存");
+  await loadRoutes();
 }
 function routeCard(r){
   const targets = (r.target || "").split(",").filter(Boolean).length;
