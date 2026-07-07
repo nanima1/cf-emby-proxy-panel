@@ -181,6 +181,10 @@ async function handleApi(request, env, ctx) {
     return handleDnsStatus(env);
   }
 
+  if (url.pathname === "/api/dns-preview" && request.method === "POST") {
+    return handleDnsPreview(request, env);
+  }
+
   if (url.pathname === "/api/update-dns" && request.method === "POST") {
     return handleDnsUpdate(request, env);
   }
@@ -772,40 +776,56 @@ async function handleDnsStatus(env) {
   return json({ success: data.success, result: data.result || [], errors: data.errors || [] }, response.ok ? 200 : 502);
 }
 
+async function handleDnsPreview(request, env) {
+  const dns = getDnsEnv(env);
+  if (!dns.ok) return json({ success: false, error: dns.error }, 400);
+  const body = await readJson(request);
+  const ips = normalizeDnsInputs(body.ips);
+  if (!ips.length) return json({ success: false, error: "请选择至少一个 IP 或域名" }, 400);
+  const proxied = body.proxied === undefined ? false : Boolean(body.proxied);
+  let plan;
+  try {
+    plan = await buildDnsPlan(env, dns, ips, proxied);
+  } catch (error) {
+    return json({ success: false, error: error.message || "获取 DNS 预览失败" }, 502);
+  }
+  return json({ success: true, domain: dns.domain, proxied, ...plan });
+}
+
 async function handleDnsUpdate(request, env) {
   const dns = getDnsEnv(env);
   if (!dns.ok) return json({ success: false, error: dns.error }, 400);
   const body = await readJson(request);
-  const ips = Array.isArray(body.ips) ? body.ips.map(normalizeDnsContent).filter(Boolean) : [];
+  const ips = normalizeDnsInputs(body.ips);
   if (!ips.length) return json({ success: false, error: "请选择至少一个 IP 或域名" }, 400);
   const proxied = body.proxied === undefined ? false : Boolean(body.proxied);
+  let plan;
+  try {
+    plan = await buildDnsPlan(env, dns, ips, proxied);
+  } catch (error) {
+    return json({ success: false, error: error.message || "获取现有 DNS 记录失败" }, 502);
+  }
 
-  const listResponse = await cfApi(env, `/zones/${dns.zoneId}/dns_records?name=${encodeURIComponent(dns.domain)}`);
-  const listData = await listResponse.json();
-  if (!listData.success) return json({ success: false, error: "获取现有 DNS 记录失败", detail: listData.errors }, 502);
-
-  const toDelete = (listData.result || []).filter((record) => ["A", "AAAA", "CNAME"].includes(record.type));
-  for (const record of toDelete) {
+  for (const record of plan.toDelete) {
     await cfApi(env, `/zones/${dns.zoneId}/dns_records/${record.id}`, { method: "DELETE" });
   }
 
   const created = [];
-  for (const content of ips) {
-    const type = getDnsRecordType(content);
+  for (const record of plan.toCreate) {
     const createResponse = await cfApi(env, `/zones/${dns.zoneId}/dns_records`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        type,
+        type: record.type,
         name: dns.domain,
-        content,
+        content: record.content,
         ttl: 60,
         proxied,
       }),
     });
     const createData = await createResponse.json();
     if (!createData.success) {
-      return json({ success: false, error: `${content} 提交失败`, detail: createData.errors }, 502);
+      return json({ success: false, error: `${record.content} 提交失败`, detail: createData.errors }, 502);
     }
     created.push(createData.result);
   }
@@ -813,8 +833,48 @@ async function handleDnsUpdate(request, env) {
   return json({
     success: true,
     message: `${dns.domain} 已指向选定的 ${created.length} 条记录`,
+    deleted: plan.toDelete.length,
     result: created,
   });
+}
+
+async function buildDnsPlan(env, dns, ips, proxied) {
+  const listResponse = await cfApi(env, `/zones/${dns.zoneId}/dns_records?name=${encodeURIComponent(dns.domain)}`);
+  const listData = await listResponse.json();
+  if (!listData.success) {
+    const detail = Array.isArray(listData.errors) ? listData.errors.map((item) => item.message || item.code || String(item)).join("; ") : "";
+    throw new Error(detail ? `获取现有 DNS 记录失败: ${detail}` : "获取现有 DNS 记录失败");
+  }
+
+  const existing = (listData.result || []).map(normalizeDnsRecord);
+  const replaceTypes = ["A", "AAAA", "CNAME"];
+  const toDelete = existing.filter((record) => replaceTypes.includes(record.type));
+  const toKeep = existing.filter((record) => !replaceTypes.includes(record.type));
+  const toCreate = ips.map((content) => ({
+    type: getDnsRecordType(content),
+    name: dns.domain,
+    content,
+    ttl: 60,
+    proxied,
+  }));
+
+  return { existing, toDelete, toKeep, toCreate };
+}
+
+function normalizeDnsInputs(value) {
+  const list = Array.isArray(value) ? value : [];
+  return Array.from(new Set(list.map(normalizeDnsContent).filter(Boolean)));
+}
+
+function normalizeDnsRecord(record) {
+  return {
+    id: record.id || "",
+    type: record.type || "",
+    name: record.name || "",
+    content: record.content || "",
+    proxied: Boolean(record.proxied),
+    ttl: record.ttl || 1,
+  };
 }
 
 async function cfApi(env, path, init = {}) {
@@ -902,6 +962,7 @@ function panelPage(env) {
 :root{--bg:#f6f7f4;--panel:#fffdf7;--ink:#202124;--muted:#68706a;--line:#d9ded4;--blue:#2563eb;--green:#14804a;--red:#d12b2b;--orange:#c26a16;--shadow:0 18px 45px rgba(30,42,35,.08)}
 *{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#f7f8f2 0,#edf5f2 42%,#f8f1e5 100%);color:var(--ink);font-family:"Segoe UI","Microsoft YaHei",sans-serif}.wrap{max-width:1280px;margin:0 auto;padding:24px}.top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:20px}.title h1{margin:0;font-size:28px}.title p{margin:6px 0 0;color:var(--muted)}.grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(360px,.8fr);gap:18px}.card{background:rgba(255,253,247,.9);border:1px solid var(--line);box-shadow:var(--shadow);border-radius:8px;padding:18px}.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}.btn{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:7px;padding:10px 13px;font-weight:700;cursor:pointer}.btn:hover{border-color:#8b9b8e}.btn:disabled{opacity:.55;cursor:not-allowed}.primary{background:var(--blue);color:#fff;border-color:var(--blue)}.danger{color:var(--red);border-color:#f1b4b4}.green{color:var(--green);border-color:#a6d5bb}.muted{color:var(--muted)}input,select,textarea{width:100%;border:1px solid var(--line);border-radius:7px;background:#fff;padding:10px 12px;font:inherit}textarea{min-height:76px;resize:vertical}.field{margin-bottom:12px}.field label{display:block;font-size:13px;font-weight:700;color:var(--muted);margin-bottom:6px}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.routes{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px}.route{border:1px solid var(--line);border-radius:8px;background:#fff;padding:14px;display:flex;flex-direction:column;gap:11px}.route-head{display:flex;justify-content:space-between;gap:10px}.prefix{font-size:20px;font-weight:800}.badge{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:999px;padding:3px 8px;font-size:12px;color:var(--muted);background:#fafafa}.target{font-family:Consolas,monospace;font-size:12px;word-break:break-all;color:#335}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}.ip-list{display:grid;gap:8px;max-height:280px;overflow:auto}.ip-item{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;border:1px solid var(--line);border-radius:7px;padding:9px;background:#fff}.ip-item code{font-size:13px}.toast{position:fixed;left:50%;top:-80px;transform:translateX(-50%);background:#202124;color:#fff;border-radius:999px;padding:12px 18px;transition:.25s;z-index:10}.toast.show{top:18px}.empty{border:1px dashed var(--line);border-radius:8px;padding:26px;text-align:center;color:var(--muted)}.footer{margin-top:18px;color:var(--muted);font-size:13px}.split{display:flex;align-items:center;justify-content:space-between;gap:12px}.switch{display:flex;gap:8px;align-items:center}.switch input{width:auto}.small{font-size:12px}.status-line{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.doctor{margin-bottom:18px}.doctor-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-top:12px}.doctor-item{min-width:0;border:1px solid var(--line);border-radius:8px;background:#fff;padding:11px;display:grid;grid-template-columns:70px 1fr;gap:10px;align-items:start}.doctor-item.pass{border-color:#a6d5bb}.doctor-item.warn,.doctor-item.info{border-color:#efd0a8}.doctor-item.fail{border-color:#f1b4b4}.doctor-level{font-weight:800;font-size:12px;text-transform:uppercase}.doctor-item.pass .doctor-level{color:var(--green)}.doctor-item.warn .doctor-level{color:var(--orange)}.doctor-item.info .doctor-level{color:var(--muted)}.doctor-item.fail .doctor-level{color:var(--red)}.doctor-message{overflow-wrap:anywhere}.doctor-action{margin-top:4px;color:var(--muted);font-size:12px;overflow-wrap:anywhere}.wizard{margin-bottom:18px}.wizard[hidden]{display:none}.wizard-grid{display:grid;grid-template-columns:minmax(260px,.8fr) minmax(320px,1.2fr);gap:14px;margin-top:12px}.wizard-steps{display:grid;gap:8px}.wizard-step{border:1px solid var(--line);border-radius:8px;background:#fff;padding:10px;display:flex;justify-content:space-between;gap:10px;align-items:center}.wizard-step strong{overflow-wrap:anywhere}.wizard-form{display:grid;gap:10px}.wizard-form .row{align-items:end}
 .wizard-step{display:grid;grid-template-columns:1fr auto;gap:6px 10px;justify-content:normal}
+.dns-preview{display:grid;gap:8px;margin:8px 0 12px}.dns-preview[hidden]{display:none}.dns-plan{border:1px solid var(--line);border-radius:8px;background:#fff;padding:10px}.dns-plan h3{font-size:14px;margin:0 0 8px}.dns-records{display:grid;gap:6px}.dns-record{display:grid;grid-template-columns:64px 1fr;gap:8px;align-items:center;font-size:12px}.dns-record code{word-break:break-all}
 @media(max-width:900px){.grid,.wizard-grid{grid-template-columns:1fr}.wrap{padding:14px}.top{flex-direction:column}.row{grid-template-columns:1fr}.routes{grid-template-columns:1fr}}
 </style>
 </head>
@@ -994,8 +1055,10 @@ function panelPage(env) {
       <div class="field"><label>自定义 IP 源 URL</label><input id="ipSource" placeholder="https://example.com/ips.json"></div>
       <div class="toolbar">
         <button class="btn" onclick="loadCustomIps()">解析自定义源</button>
+        <button class="btn" onclick="previewDns()">预览 DNS</button>
         <button class="btn green" onclick="updateDns()">写入 CF DNS</button>
       </div>
+      <div id="dnsPreview" class="dns-preview"></div>
       <div id="ipList" class="ip-list"></div>
       <p class="small muted">DNS 写入会删除目标域名已有 A/AAAA/CNAME，再创建你勾选的记录。</p>
     </aside>
@@ -1175,10 +1238,48 @@ async function pingSelected(){
   }
   ips.sort((a,b)=>(a.ms<0?999999:a.ms??999999)-(b.ms<0?999999:b.ms??999999)); renderIps();
 }
-async function updateDns(){
-  const selected = ips.filter(x=>x.checked).map(x=>x.ip);
+function selectedDnsIps(){
+  return ips.filter(x=>x.checked).map(x=>x.ip);
+}
+async function getDnsPreview(selected){
+  return api("/api/dns-preview", { method:"POST", body:JSON.stringify({ ips:selected, proxied:false }) });
+}
+async function previewDns(){
+  const selected = selectedDnsIps();
   if(!selected.length) return toast("先勾选 IP");
-  if(!confirm("确认将选中的 "+selected.length+" 条记录写入 CF DNS？")) return;
+  $("dnsPreview").hidden = false;
+  $("dnsPreview").innerHTML = '<div class="dns-plan">正在读取现有 DNS 记录...</div>';
+  try {
+    const data = await getDnsPreview(selected);
+    renderDnsPreview(data);
+    toast("DNS 预览已生成");
+    return data;
+  } catch(e) {
+    $("dnsPreview").innerHTML = '<div class="dns-plan"><strong>DNS 预览失败</strong><p class="small muted">'+escapeHtml(e.message)+'</p></div>';
+    toast("DNS 预览失败");
+    return null;
+  }
+}
+function renderDnsPreview(data){
+  const del = data.toDelete || [];
+  const create = data.toCreate || [];
+  const keep = data.toKeep || [];
+  $("dnsPreview").hidden = false;
+  $("dnsPreview").innerHTML =
+    '<div class="dns-plan"><h3>将删除 '+del.length+' 条 A/AAAA/CNAME</h3><div class="dns-records">'+dnsRecordList(del, "没有要删除的记录")+'</div></div>'+
+    '<div class="dns-plan"><h3>将创建 '+create.length+' 条记录</h3><div class="dns-records">'+dnsRecordList(create, "没有要创建的记录")+'</div></div>'+
+    (keep.length ? '<div class="dns-plan"><h3>保留 '+keep.length+' 条其他类型记录</h3><div class="dns-records">'+dnsRecordList(keep, "")+'</div></div>' : '');
+}
+function dnsRecordList(list, emptyText){
+  if(!list.length) return '<div class="small muted">'+escapeHtml(emptyText)+'</div>';
+  return list.map(r => '<div class="dns-record"><span class="badge">'+escapeHtml(r.type || "?")+'</span><code>'+escapeHtml(r.content || "")+'</code></div>').join("");
+}
+async function updateDns(){
+  const selected = selectedDnsIps();
+  if(!selected.length) return toast("先勾选 IP");
+  const plan = await previewDns();
+  if(!plan) return;
+  if(!confirm("确认写入 "+selected.length+" 条记录？\\n将删除 "+(plan.toDelete||[]).length+" 条现有 A/AAAA/CNAME。")) return;
   const data = await api("/api/update-dns", { method:"POST", body:JSON.stringify({ ips:selected, proxied:false }) });
   toast(data.message || "DNS 已更新");
 }

@@ -357,7 +357,8 @@ https://emby.example.com/hk
 3. 点 `拉取`。
 4. 勾选你想写入的 IP。
 5. 可点 `测速`，把延迟低的排前面。
-6. 点 `写入 CF DNS`。
+6. 点 `预览 DNS`，确认将删除和创建的记录。
+7. 确认无误后点 `写入 CF DNS`。
 
 写入时会删除 `CF_DOMAIN` 现有的 A/AAAA/CNAME，然后创建你勾选的新记录。
 
@@ -539,4 +540,5 @@ npm run deploy
 - `GET /api/get-remote-ips?type=all`：拉取远程优选 IP。
 - `GET /api/fetch-ips?url=...`：解析自定义 IP 源。
 - `GET /api/dns-status`：查看目标域名 DNS 记录。
+- `POST /api/dns-preview`：预览 DNS 写入会删除和创建哪些记录。
 - `POST /api/update-dns`：写入选中的 IP。

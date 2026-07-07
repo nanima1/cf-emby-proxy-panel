@@ -440,12 +440,15 @@ CF_DOMAIN
 4. 勾选几个 IP。
 5. 点 `测速`。
 6. 延迟低的保留勾选。
-7. 点 `写入 CF DNS`。
+7. 点 `预览 DNS`。
+8. 看清楚 `将删除` 和 `将创建` 的记录。
+9. 没问题再点 `写入 CF DNS`。
 
 它会做什么：
 
 - 删除 `CF_DOMAIN` 当前已有的 A/AAAA/CNAME。
 - 新建你勾选的 A/AAAA/CNAME。
+- TXT、MX 等其他类型记录会保留，不会因为这个功能删除。
 
 所以第一次用建议只选 1 到 3 个 IP 测试。
 
@@ -665,6 +668,7 @@ npx wrangler d1 execute cf-emby-proxy-panel --remote --file=./schema.sql
 3. `CF_ZONE_ID` 是否是这个域名的 Zone ID。
 4. `CF_DOMAIN` 是否属于这个 Zone。
 5. `CF_DOMAIN` 不要填成 Worker 地址，应该填你的项目域名，例如 `emby.example.com`。
+6. 先点 `预览 DNS`，如果预览都失败，说明 Cloudflare API Token 或 Zone 配置还没通。
 
 ### Emby 返回 502
 
