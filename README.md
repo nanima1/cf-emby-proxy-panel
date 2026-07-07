@@ -15,6 +15,16 @@ Cloudflare Worker 版 Emby 反代面板，支持多路径路由、优选 IP、DN
 | 第一次用 Cloudflare / D1 / Wrangler | [小白 Cloudflare 部署教程](./docs/CF_DEPLOY_BEGINNER.md) |
 | 直接从 Cloudflare 页面导入项目 | [Deploy to Cloudflare](https://deploy.workers.cloudflare.com/?url=https://github.com/nanima1/cf-emby-proxy-panel) |
 
+## 面板预览
+
+![面板预览](./docs/images/panel-preview.svg)
+
+## 小白使用流程
+
+1. 在面板右侧 `小白生成器` 填入你的 Emby 原地址，例如 `https://emby.example.com:443`。
+2. 填一个入口路径，例如 `emby`、`hk`、`home`，面板会自动显示反代后地址。
+3. 点 `生成并填入`，确认无误后点 `保存路径`，客户端里填写生成的 `https://你的域名/路径`。
+
 ## 适合场景
 
 - 用一个 Worker 域名承载多个 Emby 入口，例如 `/hk`、`/jp`、`/home`。
@@ -26,7 +36,8 @@ Cloudflare Worker 版 Emby 反代面板，支持多路径路由、优选 IP、DN
 
 | 模块 | 能力 |
 | --- | --- |
-| 路由管理 | `/路径` 分流、路由排序、多上游容灾、JSON 导入导出 |
+| 路由管理 | `/路径` 分流、拖动排序、多上游容灾、JSON 导入导出 |
+| 小白生成 | 输入 Emby 原地址和入口路径，自动填入配置并显示反代后地址 |
 | 反代兼容 | `clean`、`real-ip`、`origin`、`direct` 四种模式，兼容前后端分离 Emby |
 | 播放处理 | 自动改写 `PlaybackInfo`、m3u8、绝对媒体地址，并提供 `/proxy-stream/` 流代理 |
 | 优选 IP | 拉取远程优选 IP，解析自定义 IP 源，勾选后批量写入 DNS |
@@ -289,23 +300,23 @@ https://你的-worker.workers.dev
 
 ### 2. 新增第一个 Emby 路径
 
-第一次进入且还没有任何路径时，页面顶部会显示 `首次使用向导`。推荐先在向导里填：
+推荐先用右侧 `小白生成器`：
 
 ```text
+Emby 原地址：https://emby.example.com:443
 入口路径：hk
-Emby 上游：https://emby.example.com:443
-模式：clean
+推荐模式：clean
 ```
 
-点 `保存第一条路由` 后，你的入口就是：
+点 `生成并填入` 后，面板会自动填好下面的路径表单，并显示反代后地址：
 
 ```text
 https://你的-worker.workers.dev/hk
 ```
 
-Emby 客户端里服务器地址也填这个。
+确认无误后点 `保存路径`。Emby 客户端里的服务器地址就填这个反代后地址。
 
-如果你已经关闭了向导，也可以点 `新增路径` 手动填写，内容和上面一样。
+如果你已经很熟悉，也可以跳过生成器，直接在下面的路径表单手动填写同样的内容。
 
 ### 3. 多个 Emby 怎么填
 

@@ -1031,6 +1031,7 @@ function panelPage(env) {
 .access-card{margin-bottom:18px}.access-list{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
 .snapshot-card{margin-bottom:18px}
 .stats{margin-bottom:18px}.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:12px}.stat-box{border:1px solid var(--line);border-radius:8px;background:rgba(255,255,255,.6);box-shadow:var(--inner);padding:12px}.stat-value{font-size:26px;font-weight:800;color:#172033}.stat-list{display:grid;gap:7px}.stat-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;border:1px solid var(--line);border-radius:7px;padding:8px;background:rgba(255,255,255,.58);box-shadow:var(--inner)}
+.quick-card{border:1px solid var(--line);border-radius:8px;background:rgba(255,255,255,.56);box-shadow:var(--inner);padding:12px;margin:0 0 14px}.quick-card h3{font-size:16px;margin:0 0 6px}.quick-result{border:1px dashed rgba(37,99,235,.35);border-radius:8px;background:rgba(239,246,255,.62);padding:10px;margin-top:10px}.quick-url{display:block;margin:6px 0 10px;font-family:Consolas,monospace;font-size:13px;word-break:break-all;color:#1d4ed8}.route{position:relative;transition:transform .18s,box-shadow .18s,opacity .18s}.routes.dragging .route{cursor:grabbing}.route.dragging{opacity:.55;transform:scale(.985)}.route.drag-before::before,.route.drag-after::after{content:"";position:absolute;left:12px;right:12px;height:3px;border-radius:999px;background:#2563eb;box-shadow:0 0 0 4px rgba(37,99,235,.13)}.route.drag-before::before{top:-8px}.route.drag-after::after{bottom:-8px}.prefix-row{display:flex;align-items:center;gap:8px}.drag-handle{display:inline-grid;place-items:center;width:26px;height:26px;border:1px solid var(--line-strong);border-radius:7px;background:rgba(255,255,255,.68);color:var(--muted);cursor:grab;user-select:none;font-weight:800}.route.dragging .drag-handle{cursor:grabbing}
 @media(max-width:900px){.grid,.wizard-grid{grid-template-columns:1fr}.wrap{padding:14px}.top{flex-direction:column}.row{grid-template-columns:1fr}.routes{grid-template-columns:1fr}}
 </style>
 </head>
@@ -1139,6 +1140,24 @@ function panelPage(env) {
     </div>
     <aside class="card">
       <h2 style="margin-top:0">配置</h2>
+      <section class="quick-card">
+        <h3>小白生成器</h3>
+        <p class="small muted">填原 Emby 地址和入口路径，自动生成客户端要填写的反代后地址。</p>
+        <div class="field"><label>Emby 原地址</label><input id="quickTarget" placeholder="https://emby.example.com:443"></div>
+        <div class="row">
+          <div class="field"><label>入口路径</label><input id="quickPrefix" value="emby" placeholder="emby" oninput="updateQuickProxyUrl()"></div>
+          <div class="field"><label>推荐模式</label><select id="quickMode"><option value="clean">clean</option><option value="origin">origin 前后端分离</option><option value="real-ip">real-ip</option><option value="direct">direct</option></select></div>
+        </div>
+        <div class="toolbar" style="margin-bottom:0">
+          <button class="btn primary" type="button" onclick="generateBeginnerRoute()">生成并填入</button>
+          <button class="btn" type="button" onclick="copyQuickProxyUrl()">复制反代地址</button>
+        </div>
+        <div class="quick-result" id="quickResult" hidden>
+          <div class="small muted">反代后地址</div>
+          <code class="quick-url" id="quickProxyUrl"></code>
+          <div class="small muted">确认无误后，点下面的“保存路径”。</div>
+        </div>
+      </section>
       <form id="routeForm" onsubmit="saveRoute(event)">
         <input id="oldPrefix" type="hidden">
         <div class="row">
@@ -1184,6 +1203,7 @@ let doctorState = null;
 let versionState = null;
 let routeHealth = {};
 let statsState = [];
+let draggedPrefix = "";
 let wizardDismissed = false;
 const $ = (id) => document.getElementById(id);
 function toast(msg){ const el=$("toast"); el.textContent=msg; el.classList.add("show"); setTimeout(()=>el.classList.remove("show"),2600); }
@@ -1390,10 +1410,61 @@ async function saveWizardRoute(e){
 function routeCard(r){
   const targets = routeTargets(r).length;
   const url = location.origin + "/" + r.prefix;
-  return '<article class="route"><div class="route-head"><div><div class="prefix">'+escapeHtml(r.icon || "🎞️")+" /"+escapeHtml(r.prefix)+'</div><div class="muted small">'+escapeHtml(r.remark || "无备注")+'</div></div><span class="badge">'+escapeHtml(r.mode || "clean")+'</span></div><div class="target">'+escapeHtml(r.target)+'</div><div class="status-line"><span class="badge">'+targets+' 个上游</span>'+routeHealthBadge(r.prefix)+'<span class="badge">今日播放 '+(r.todayReqs||0)+'</span><span class="badge">'+(r.cacheImages ? "缓存开" : "缓存关")+'</span></div><div class="actions"><button class="btn" onclick="copyText(\\''+url+'\\')">复制入口</button><button class="btn" onclick="pingRoute(\\''+escapeAttr(r.prefix)+'\\')">测速</button><button class="btn" onclick="moveRoute(\\''+escapeAttr(r.prefix)+'\\',-1)">上移</button><button class="btn" onclick="moveRoute(\\''+escapeAttr(r.prefix)+'\\',1)">下移</button><button class="btn" onclick="editRoute(\\''+escapeAttr(r.prefix)+'\\')">编辑</button><button class="btn danger" onclick="deleteRoute(\\''+escapeAttr(r.prefix)+'\\')">删除</button></div></article>';
+  const safePrefix = escapeAttr(r.prefix);
+  return '<article class="route" draggable="true" data-prefix="'+safePrefix+'" ondragstart="startRouteDrag(event,\\''+safePrefix+'\\')" ondragover="overRouteDrag(event,\\''+safePrefix+'\\')" ondragleave="leaveRouteDrag(event)" ondrop="dropRoute(event,\\''+safePrefix+'\\')" ondragend="endRouteDrag()"><div class="route-head"><div><div class="prefix-row"><span class="drag-handle" title="拖动排序" aria-label="拖动排序">↕</span><div class="prefix">'+escapeHtml(r.icon || "🎞️")+" /"+escapeHtml(r.prefix)+'</div></div><div class="muted small">'+escapeHtml(r.remark || "无备注")+'</div></div><span class="badge">'+escapeHtml(r.mode || "clean")+'</span></div><div class="target">'+escapeHtml(r.target)+'</div><div class="status-line"><span class="badge">'+targets+' 个上游</span>'+routeHealthBadge(r.prefix)+'<span class="badge">今日播放 '+(r.todayReqs||0)+'</span><span class="badge">'+(r.cacheImages ? "缓存开" : "缓存关")+'</span></div><div class="actions"><button class="btn" onclick="copyText(\\''+url+'\\')">复制入口</button><button class="btn" onclick="pingRoute(\\''+safePrefix+'\\')">测速</button><button class="btn" onclick="moveRoute(\\''+safePrefix+'\\',-1)">上移</button><button class="btn" onclick="moveRoute(\\''+safePrefix+'\\',1)">下移</button><button class="btn" onclick="editRoute(\\''+safePrefix+'\\')">编辑</button><button class="btn danger" onclick="deleteRoute(\\''+safePrefix+'\\')">删除</button></div></article>';
 }
 function routeTargets(route){
   return String(route.target || "").split(",").map(x => x.trim()).filter(Boolean);
+}
+function normalizeBeginnerPrefix(value){
+  const cleaned = String(value || "emby").trim().replace(/^\/+/, "").replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 64);
+  return cleaned || "emby";
+}
+function normalizeBeginnerTarget(value){
+  let input = String(value || "").trim();
+  if(!input) throw new Error("先填写 Emby 原地址");
+  if(!/^https?:\/\//i.test(input)) input = "https://" + input;
+  const url = new URL(input);
+  url.hash = "";
+  url.search = "";
+  if(url.pathname === "/web" || url.pathname.startsWith("/web/")) url.pathname = "/";
+  return url.toString().replace(/\/$/, "");
+}
+function updateQuickProxyUrl(prefixValue){
+  const input = $("quickPrefix");
+  const result = $("quickResult");
+  const output = $("quickProxyUrl");
+  if(!input || !result || !output) return "";
+  const prefix = normalizeBeginnerPrefix(prefixValue || input.value);
+  const url = location.origin + "/" + prefix;
+  output.textContent = url;
+  result.hidden = false;
+  return url;
+}
+function generateBeginnerRoute(){
+  try {
+    const prefix = normalizeBeginnerPrefix($("quickPrefix").value);
+    const target = normalizeBeginnerTarget($("quickTarget").value);
+    $("quickPrefix").value = prefix;
+    $("oldPrefix").value = "";
+    $("prefix").value = prefix;
+    $("target").value = target;
+    $("mode").value = $("quickMode").value || "clean";
+    $("browserMode").value = "status";
+    $("icon").value = "";
+    $("remark").value = "小白生成";
+    $("cacheImages").checked = true;
+    updateQuickProxyUrl(prefix);
+    toast("已生成反代地址，确认后点保存路径");
+  } catch(e) {
+    toast(e.message || "生成失败");
+  }
+}
+async function copyQuickProxyUrl(){
+  const url = updateQuickProxyUrl();
+  if(!url) return;
+  await navigator.clipboard.writeText(url);
+  toast("反代地址已复制");
 }
 function renderSnapshot(){
   const grid = $("snapshotGrid");
@@ -1545,6 +1616,68 @@ async function moveRoute(prefix, direction){
 }
 async function saveRouteOrder(){
   await api("/api/routes/reorder", { method:"POST", body:JSON.stringify(routes.map(r => r.prefix)) });
+}
+function startRouteDrag(event, prefix){
+  draggedPrefix = prefix;
+  if(event.dataTransfer) {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", prefix);
+  }
+  event.currentTarget.classList.add("dragging");
+  $("routes")?.classList.add("dragging");
+}
+function overRouteDrag(event, prefix){
+  if(!draggedPrefix || draggedPrefix === prefix) return;
+  event.preventDefault();
+  clearDragTargets();
+  const rect = event.currentTarget.getBoundingClientRect();
+  const after = event.clientY > rect.top + rect.height / 2;
+  event.currentTarget.classList.add(after ? "drag-after" : "drag-before");
+  if(event.dataTransfer) event.dataTransfer.dropEffect = "move";
+}
+function leaveRouteDrag(event){
+  event.currentTarget.classList.remove("drag-before", "drag-after");
+}
+async function dropRoute(event, targetPrefix){
+  event.preventDefault();
+  const sourcePrefix = event.dataTransfer?.getData("text/plain") || draggedPrefix;
+  const after = event.currentTarget.classList.contains("drag-after");
+  clearDragTargets();
+  await reorderDraggedRoute(sourcePrefix, targetPrefix, after);
+  endRouteDrag();
+}
+function endRouteDrag(){
+  draggedPrefix = "";
+  clearDragTargets();
+  document.querySelectorAll(".route.dragging").forEach(el => el.classList.remove("dragging"));
+  $("routes")?.classList.remove("dragging");
+}
+function clearDragTargets(){
+  document.querySelectorAll(".route.drag-before,.route.drag-after").forEach(el => el.classList.remove("drag-before", "drag-after"));
+}
+async function reorderDraggedRoute(sourcePrefix, targetPrefix, after){
+  if(!sourcePrefix || !targetPrefix || sourcePrefix === targetPrefix) return;
+  const previous = routes.slice();
+  const from = routes.findIndex(x => x.prefix === sourcePrefix);
+  if(from < 0) return;
+  const item = routes.splice(from, 1)[0];
+  let insertIndex = routes.findIndex(x => x.prefix === targetPrefix);
+  if(insertIndex < 0) {
+    routes = previous;
+    return;
+  }
+  if(after) insertIndex += 1;
+  routes.splice(insertIndex, 0, item);
+  routes.forEach((route, order) => { route.order_idx = order; });
+  renderRoutes();
+  try {
+    await saveRouteOrder();
+    toast("拖动排序已保存");
+  } catch(e) {
+    routes = previous;
+    renderRoutes();
+    toast("排序保存失败: "+e.message);
+  }
 }
 async function deleteRoute(prefix){ if(!confirm("删除 /"+prefix+" ?")) return; await api("/api/routes?prefix="+encodeURIComponent(prefix), { method:"DELETE" }); toast("已删除"); await loadRoutes(); await loadStats(); }
 async function pingRoute(prefix){
