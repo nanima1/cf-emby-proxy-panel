@@ -1,39 +1,40 @@
 # CF Emby Proxy Panel
 
-Cloudflare Worker 版 Emby 反代面板。你可以在网页面板里用 `/路径` 管理多个 Emby 上游，拉取优选 IP，并把选中的 IP 自动写入 Cloudflare DNS，让项目域名走 Cloudflare CDN 加速。
+Cloudflare Worker 版 Emby 反代面板，支持多路径路由、优选 IP、DNS 自动写入、播放链路改写、部署自检和可视化管理。
 
-> 想快速部署，先看：
->
-> [快速部署](./docs/QUICK_DEPLOY.md)
->
-> 第一次部署、看不懂 D1 / Wrangler / 变量的，看这篇超详细教程：
->
-> [小白 Cloudflare 部署教程](./docs/CF_DEPLOY_BEGINNER.md)
->
-> Cloudflare 仓库导入入口：
->
-> [Deploy to Cloudflare](https://deploy.workers.cloudflare.com/?url=https://github.com/nanima1/cf-emby-proxy-panel)
+[![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflare&logoColor=white)](https://workers.cloudflare.com/)
+[![Cloudflare D1](https://img.shields.io/badge/Cloudflare-D1-F38020?logo=cloudflare&logoColor=white)](https://developers.cloudflare.com/d1/)
+[![Wrangler](https://img.shields.io/badge/Wrangler-4.x-222222?logo=npm&logoColor=white)](https://developers.cloudflare.com/workers/wrangler/)
+[![Deploy](https://img.shields.io/badge/Deploy%20to-Cloudflare-F38020?logo=cloudflare&logoColor=white)](https://deploy.workers.cloudflare.com/?url=https://github.com/nanima1/cf-emby-proxy-panel)
 
-这个项目整理自 `double.js`、`Pro-Worker.js` 的最终版逻辑，并合并了 `hbh-proxy worker.js` 与 `反代 + HTML.txt` 里的访问控制、状态页、客户端识别、流代理和缓存思路。
+## 快速入口
 
-## 功能概览
+| 场景 | 推荐入口 |
+| --- | --- |
+| 想先快速跑起来 | [快速部署](./docs/QUICK_DEPLOY.md) |
+| 第一次用 Cloudflare / D1 / Wrangler | [小白 Cloudflare 部署教程](./docs/CF_DEPLOY_BEGINNER.md) |
+| 直接从 Cloudflare 页面导入项目 | [Deploy to Cloudflare](https://deploy.workers.cloudflare.com/?url=https://github.com/nanima1/cf-emby-proxy-panel) |
 
-- 路径分流：用 `/hk`、`/jp`、`/home` 等路径添加不同 Emby。
-- 路由排序：面板支持上移/下移路径顺序，排序会保存到 D1。
-- 多上游容灾：同一路径可配置多个上游，用英文逗号分隔，一个失败会自动尝试下一个。
-- 上游健康测试：面板支持一键测试全部路径的所有上游，显示可用数量和最快延迟。
-- 前后端分离：`origin` 模式会重写 `Origin`、`Referer`，适合前后端分离 Emby。
-- 优选 IP：面板可拉取远程优选 IP，也能解析自定义 IP 源。
-- DNS 自动化：勾选 IP 后自动更新 `CF_DOMAIN` 的 A/AAAA/CNAME 记录。
-- 播放兼容：自动改写 `PlaybackInfo`、m3u8、绝对媒体地址，并提供 `/proxy-stream/` 流代理。
-- 缓存优化：可对图片、字幕、静态资源启用 Cloudflare 缓存。
-- 统计记录：使用 D1 记录每日播放请求数和最后播放时间。
-- 统计概览：面板显示累计播放、活跃路径、路由数量和热门路径排行。
-- 访问控制：支持阻止国家、阻止脚本客户端关键词、浏览器状态页或浏览器拦截，并在面板显示当前全局规则。
-- 部署自检：面板内置 `/api/doctor`，可以检查 D1、DNS 变量、Cloudflare DNS API 和默认上游，并一键复制诊断报告。
-- 版本提示：面板可检查 GitHub main 分支最新提交，方便判断是否需要更新。
-- 首次向导：新部署没有路径时，面板会引导添加第一条 Emby 路由。
-- 配置备份：面板支持导出/导入路由 JSON，同名路径导入时会覆盖更新。
+## 适合场景
+
+- 用一个 Worker 域名承载多个 Emby 入口，例如 `/hk`、`/jp`、`/home`。
+- 在面板里拉取优选 IP，并把选中的 IP 自动写入 Cloudflare DNS。
+- 给前后端分离的 Emby 做反代，减少播放、m3u8、绝对地址跳转问题。
+- 想通过网页面板维护路由、访问控制、DNS、统计和部署诊断。
+
+## 功能亮点
+
+| 模块 | 能力 |
+| --- | --- |
+| 路由管理 | `/路径` 分流、路由排序、多上游容灾、JSON 导入导出 |
+| 反代兼容 | `clean`、`real-ip`、`origin`、`direct` 四种模式，兼容前后端分离 Emby |
+| 播放处理 | 自动改写 `PlaybackInfo`、m3u8、绝对媒体地址，并提供 `/proxy-stream/` 流代理 |
+| 优选 IP | 拉取远程优选 IP，解析自定义 IP 源，勾选后批量写入 DNS |
+| DNS 自动化 | 预览 DNS 变更，自动更新 `CF_DOMAIN` 的 A/AAAA/CNAME 记录 |
+| 上游检测 | 一键测试全部路径的所有上游，显示可用数量和最快延迟 |
+| 访问控制 | 支持国家拦截、客户端关键词拦截、浏览器状态页和浏览器拦截 |
+| 统计面板 | 记录每日播放请求数、最后播放时间、热门路径和总览数据 |
+| 部署维护 | 首次使用向导、`/api/doctor` 自检、诊断报告复制、GitHub 版本检查 |
 
 ## 你需要准备
 
