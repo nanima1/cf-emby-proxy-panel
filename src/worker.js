@@ -1249,12 +1249,17 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;background-ima
       <form id="routeForm" onsubmit="saveRoute(event)">
         <input id="oldPrefix" type="hidden">
         <div class="row">
-          <div class="field"><label>路径前缀</label><input id="prefix" placeholder="hk / jp / home" required></div>
+          <div class="field"><label>路径前缀</label><input id="prefix" placeholder="hk / jp / home" oninput="updateRoutePreview()" required></div>
           <div class="field"><label>图标</label><input id="icon" placeholder="🎬"></div>
         </div>
-        <div class="field"><label>上游 Emby，可用逗号或换行分隔做故障切换</label><textarea id="target" placeholder="https://emby-a.example.com:443&#10;https://emby-b.example.com:443" required></textarea></div>
+        <div class="field"><label>上游 Emby，可用逗号或换行分隔做故障切换</label><textarea id="target" placeholder="https://emby-a.example.com:443&#10;https://emby-b.example.com:443" oninput="updateRoutePreview()" required></textarea></div>
+        <div class="quick-result" id="routePreview" hidden>
+          <div class="small muted">客户端入口预览</div>
+          <code class="quick-url" id="routePreviewUrl"></code>
+          <div class="status-line" id="routePreviewMeta"></div>
+        </div>
         <div class="row">
-          <div class="field"><label>反代模式</label><select id="mode"><option value="clean">clean 隐藏真实 IP</option><option value="real-ip">real-ip 传递客户端 IP</option><option value="origin">origin 前后端分离</option><option value="direct">direct 尽量保留请求头</option></select></div>
+          <div class="field"><label>反代模式</label><select id="mode" onchange="updateRoutePreview()"><option value="clean">clean 隐藏真实 IP</option><option value="real-ip">real-ip 传递客户端 IP</option><option value="origin">origin 前后端分离</option><option value="direct">direct 尽量保留请求头</option></select></div>
           <div class="field"><label>浏览器访问</label><select id="browserMode"><option value="proxy">proxy 直接反代</option><option value="status">status 显示状态页</option><option value="block">block 阻止浏览器</option></select></div>
         </div>
         <div class="field"><label>备注</label><input id="remark" placeholder="香港主线 / 家宽 / 备用节点"></div>
@@ -1500,13 +1505,39 @@ function routeCard(r){
   const targets = routeTargets(r).length;
   const url = location.origin + "/" + r.prefix;
   const safePrefix = escapeAttr(r.prefix);
-  return '<article class="route" data-prefix="'+safePrefix+'"><div class="route-head"><div><div class="prefix-row"><span class="drag-handle" title="按住拖动排序" aria-label="按住拖动排序" onpointerdown="beginRoutePointerDrag(event,\\''+safePrefix+'\\')">↕</span><div class="prefix">'+escapeHtml(r.icon || "🎞️")+" /"+escapeHtml(r.prefix)+'</div></div><div class="muted small">'+escapeHtml(r.remark || "无备注")+'</div></div><span class="badge">'+escapeHtml(r.mode || "clean")+'</span></div><div class="target">'+escapeHtml(r.target)+'</div><div class="status-line"><span class="badge">'+targets+' 个上游</span>'+routeHealthBadge(r.prefix)+'<span class="badge">今日播放 '+(r.todayReqs||0)+'</span><span class="badge">'+(r.cacheImages ? "缓存开" : "缓存关")+'</span></div><div class="actions"><button class="btn" onclick="copyText(\\''+url+'\\')">复制入口</button><button class="btn" onclick="pingRoute(\\''+safePrefix+'\\')">测速</button><button class="btn" onclick="moveRoute(\\''+safePrefix+'\\',-1)">上移</button><button class="btn" onclick="moveRoute(\\''+safePrefix+'\\',1)">下移</button><button class="btn" onclick="editRoute(\\''+safePrefix+'\\')">编辑</button><button class="btn danger" onclick="deleteRoute(\\''+safePrefix+'\\')">删除</button></div></article>';
+  return '<article class="route" data-prefix="'+safePrefix+'"><div class="route-head"><div><div class="prefix-row"><span class="drag-handle" title="按住拖动排序" aria-label="按住拖动排序" onpointerdown="beginRoutePointerDrag(event,\\''+safePrefix+'\\')">↕</span><div class="prefix">'+escapeHtml(r.icon || "🎞️")+" /"+escapeHtml(r.prefix)+'</div></div><div class="muted small">'+escapeHtml(r.remark || "无备注")+'</div></div><span class="badge">'+escapeHtml(r.mode || "clean")+'</span></div><div class="target">'+escapeHtml(r.target)+'</div><div class="status-line"><span class="badge">'+targets+' 个上游</span>'+routeHealthBadge(r.prefix)+'<span class="badge">今日播放 '+(r.todayReqs||0)+'</span><span class="badge">'+(r.cacheImages ? "缓存开" : "缓存关")+'</span></div><div class="actions"><button class="btn" onclick="copyText(\\''+url+'\\')">复制入口</button><button class="btn" onclick="copyRouteSummary(\\''+safePrefix+'\\')">复制配置</button><button class="btn" onclick="pingRoute(\\''+safePrefix+'\\')">测速</button><button class="btn" onclick="moveRoute(\\''+safePrefix+'\\',-1)">上移</button><button class="btn" onclick="moveRoute(\\''+safePrefix+'\\',1)">下移</button><button class="btn" onclick="editRoute(\\''+safePrefix+'\\')">编辑</button><button class="btn danger" onclick="deleteRoute(\\''+safePrefix+'\\')">删除</button></div></article>';
 }
 function routeTargets(route){
   return String(route.target || "").split(new RegExp("[,\\\\n\\\\r]+")).map(x => x.trim()).filter(Boolean);
 }
 function routeExists(prefix, oldPrefix=""){
   return routes.some(route => route.prefix === prefix && route.prefix !== oldPrefix);
+}
+function updateRoutePreview(){
+  const box = $("routePreview");
+  const urlEl = $("routePreviewUrl");
+  const meta = $("routePreviewMeta");
+  if(!box || !urlEl || !meta) return "";
+  const rawPrefix = $("prefix")?.value || "";
+  const rawTarget = $("target")?.value || "";
+  const targets = routeTargets({ target: rawTarget });
+  if(!rawPrefix.trim() && !targets.length) {
+    box.hidden = true;
+    urlEl.textContent = "";
+    meta.innerHTML = "";
+    return "";
+  }
+  const prefix = normalizeBeginnerPrefix(rawPrefix);
+  const oldPrefix = $("oldPrefix")?.value || "";
+  const mode = $("mode")?.value || "clean";
+  const url = location.origin + "/" + prefix;
+  urlEl.textContent = url;
+  meta.innerHTML =
+    '<span class="badge">'+targets.length+' 个上游</span>'+
+    '<span class="badge">'+escapeHtml(mode)+'</span>'+
+    (routeExists(prefix, oldPrefix) ? '<span class="badge">将覆盖已有路径</span>' : '<span class="badge">可保存</span>');
+  box.hidden = false;
+  return url;
 }
 function normalizeBeginnerPrefix(value){
   const cleaned = String(value || "emby").trim().replace(new RegExp("^/+"), "").replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 64);
@@ -1548,6 +1579,7 @@ function generateBeginnerRoute(){
     $("remark").value = "小白生成";
     $("cacheImages").checked = true;
     updateQuickProxyUrl(prefix);
+    updateRoutePreview();
     toast("已生成反代地址，确认后点保存路径");
   } catch(e) {
     toast(e.message || "生成失败");
@@ -1580,6 +1612,7 @@ async function createBeginnerRoute(){
     $("remark").value = "小白生成";
     $("cacheImages").checked = true;
     const url = updateQuickProxyUrl(prefix);
+    updateRoutePreview();
     try { await navigator.clipboard.writeText(url); } catch {}
     await loadRoutes();
     await loadStats();
@@ -1821,10 +1854,11 @@ async function importRoutesFile(event){
     toast("导入失败: "+e.message);
   }
 }
-function newRoute(){ $("routeForm").reset(); $("oldPrefix").value=""; $("cacheImages").checked=true; $("mode").value="clean"; $("browserMode").value="proxy"; $("prefix").focus(); }
+function newRoute(){ $("routeForm").reset(); $("oldPrefix").value=""; $("cacheImages").checked=true; $("mode").value="clean"; $("browserMode").value="proxy"; updateRoutePreview(); $("prefix").focus(); }
 function editRoute(prefix){
   const r = routes.find(x => x.prefix === prefix); if(!r) return;
   $("oldPrefix").value = r.prefix; $("prefix").value = r.prefix; $("target").value = r.target; $("mode").value = r.mode || "clean"; $("icon").value = r.icon || ""; $("remark").value = r.remark || ""; $("cacheImages").checked = !!r.cacheImages; $("browserMode").value = (r.accessPolicy && r.accessPolicy.browserMode) || "proxy";
+  updateRoutePreview();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 async function saveRoute(e){
@@ -2062,6 +2096,25 @@ async function updateDns(){
   toast(data.message || "DNS 已更新");
 }
 async function copyText(text){ await navigator.clipboard.writeText(text); toast("已复制"); }
+async function copyRouteSummary(prefix){
+  const route = routes.find(x => x.prefix === prefix);
+  if(!route) return toast("没有找到这条路由");
+  const targets = routeTargets(route);
+  const browserMode = (route.accessPolicy && route.accessPolicy.browserMode) || "proxy";
+  const text = [
+    "Emby 反代配置",
+    "客户端地址: " + location.origin + "/" + route.prefix,
+    "路径: /" + route.prefix,
+    "模式: " + (route.mode || "clean"),
+    "浏览器访问: " + browserMode,
+    "图片缓存: " + (route.cacheImages ? "开启" : "关闭"),
+    "上游数量: " + targets.length,
+    "上游:",
+    ...targets.map((target, index) => (index + 1) + ". " + target),
+  ].join("\\n");
+  await navigator.clipboard.writeText(text);
+  toast("路由配置已复制");
+}
 async function logout(){ await api("/api/logout", { method:"POST" }); location.reload(); }
 function escapeHtml(s){ return String(s ?? "").replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;","'":"&#39;"}[m])); }
 function escapeAttr(s){ return escapeHtml(s).replace(/\\\\/g,"\\\\\\\\").replace(/'/g,"\\\\'"); }
