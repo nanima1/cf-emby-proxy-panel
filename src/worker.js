@@ -1007,8 +1007,21 @@ async function buildDnsPlan(env, dns, ips, proxied) {
 }
 
 function normalizeDnsInputs(value) {
-  const list = Array.isArray(value) ? value : [];
-  return Array.from(new Set(list.map(normalizeDnsContent).filter(Boolean)));
+  const list = Array.isArray(value) ? value : String(value || "").split(/[,\n\r]+/);
+  const normalized = [];
+  const invalid = [];
+  for (const item of list) {
+    try {
+      const content = normalizeDnsContent(item);
+      if (content) normalized.push(content);
+    } catch (error) {
+      invalid.push(error.message || String(error));
+    }
+  }
+  if (invalid.length) {
+    throw badRequest(`DNS 内容无效：${invalid.slice(0, 3).join("；")}`);
+  }
+  return Array.from(new Set(normalized));
 }
 
 function normalizeDnsRecord(record) {
@@ -2489,7 +2502,28 @@ function wrapIpv6(value) {
 }
 
 function normalizeDnsContent(value) {
-  return String(value || "").trim().replace(/^\[|\]$/g, "");
+  let input = String(value || "").trim();
+  if (!input) return "";
+  if (/^https?:\/\//i.test(input)) {
+    try {
+      input = new URL(input).hostname;
+    } catch {
+      throw new Error(`${input} 不是有效 URL`);
+    }
+  }
+  input = input.replace(/^\[|\]$/g, "").replace(/\.$/, "").trim();
+  if (!input) return "";
+  if (isValidIpv4(input)) {
+    if (isPrivateIpv4(input)) throw new Error(`${input} 是内网/本机 IP`);
+    return input;
+  }
+  if (isIpv4Like(input)) throw new Error(`${input} 不是有效 IPv4`);
+  if (input.includes(":")) {
+    if (!isValidIpv6(input)) throw new Error(`${input} 不是有效 IPv6`);
+    return input.toLowerCase();
+  }
+  if (!isValidHostname(input)) throw new Error(`${input} 不是有效域名`);
+  return input.toLowerCase();
 }
 
 function getDnsRecordType(content) {
@@ -2500,6 +2534,30 @@ function getDnsRecordType(content) {
 
 function isPrivateIpv4(ip) {
   return ip.startsWith("10.") || ip.startsWith("192.168.") || ip.startsWith("127.") || /^172\.(1[6-9]|2\d|3[0-1])\./.test(ip);
+}
+
+function isValidIpv4(value) {
+  const parts = String(value || "").split(".");
+  return parts.length === 4 && parts.every((part) => /^\d{1,3}$/.test(part) && Number(part) >= 0 && Number(part) <= 255);
+}
+
+function isIpv4Like(value) {
+  return /^\d+(?:\.\d+){3}$/.test(String(value || ""));
+}
+
+function isValidIpv6(value) {
+  try {
+    const parsed = new URL(`http://[${String(value || "").replace(/^\[|\]$/g, "")}]`);
+    return parsed.hostname.includes(":");
+  } catch {
+    return false;
+  }
+}
+
+function isValidHostname(value) {
+  const host = String(value || "").toLowerCase();
+  if (host.length > 253 || host.includes("..") || !host.includes(".")) return false;
+  return host.split(".").every((label) => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label));
 }
 
 function shuffle(items) {

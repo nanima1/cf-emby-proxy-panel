@@ -220,6 +220,82 @@ async function testEnvBrowserModeNormalization() {
   assert.equal((await invalid.json()).browserMode, "proxy");
 }
 
+async function testDnsInputValidationAndNormalization() {
+  const originalFetch = globalThis.fetch;
+  const requests = [];
+  globalThis.fetch = async (url, init = {}) => {
+    requests.push({ url: String(url), init });
+    return new Response(JSON.stringify({
+      success: true,
+      result: [
+        { id: "old-a", type: "A", name: "emby.example.com", content: "1.1.1.1", proxied: false, ttl: 60 },
+        { id: "keep-txt", type: "TXT", name: "emby.example.com", content: "keep", proxied: false, ttl: 60 },
+      ],
+    }), { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+  const env = { CF_API_TOKEN: "token", CF_ZONE_ID: "zone", CF_DOMAIN: "emby.example.com" };
+  try {
+    const preview = await worker.fetch(
+      new Request("https://panel.test/api/dns-preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ips: [" 8.8.8.8 ", "[2001:db8::1]", "CDN.Example.COM.", "https://media.example.net/path", "8.8.8.8"] }),
+      }),
+      env,
+      {},
+    );
+    assert.equal(preview.status, 200);
+    const data = await preview.json();
+    assert.deepEqual(data.toCreate.map((item) => [item.type, item.content]), [
+      ["A", "8.8.8.8"],
+      ["AAAA", "2001:db8::1"],
+      ["CNAME", "cdn.example.com"],
+      ["CNAME", "media.example.net"],
+    ]);
+    assert.equal(data.toDelete.length, 1);
+    assert.equal(data.toKeep.length, 1);
+
+    const beforeInvalidCount = requests.length;
+    const privateIp = await worker.fetch(
+      new Request("https://panel.test/api/dns-preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ips: ["192.168.1.2"] }),
+      }),
+      env,
+      {},
+    );
+    assert.equal(privateIp.status, 400);
+    assert.match((await privateIp.json()).error, /DNS 内容无效/);
+    assert.equal(requests.length, beforeInvalidCount, "invalid DNS input should not call Cloudflare");
+
+    const badHost = await worker.fetch(
+      new Request("https://panel.test/api/dns-preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ips: ["bad host"] }),
+      }),
+      env,
+      {},
+    );
+    assert.equal(badHost.status, 400);
+
+    const badIpv4 = await worker.fetch(
+      new Request("https://panel.test/api/dns-preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ips: ["999.999.999.999"] }),
+      }),
+      env,
+      {},
+    );
+    assert.equal(badIpv4.status, 400);
+    assert.match((await badIpv4.json()).error, /不是有效 IPv4/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+}
+
 function testMarkdownLinks() {
   const files = [
     "README.md",
@@ -245,5 +321,6 @@ await testInvalidRouteReturnsBadRequest();
 await testImportRoutesValidation();
 await testInvalidJsonReturnsBadRequest();
 await testEnvBrowserModeNormalization();
+await testDnsInputValidationAndNormalization();
 testMarkdownLinks();
 console.log("PANEL_TESTS_OK");

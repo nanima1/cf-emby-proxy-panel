@@ -86,7 +86,20 @@ npm run deploy
 
 部署成功后打开 Wrangler 输出的 Worker 地址。
 
-## 8. 第一次进面板
+## 8. 部署后检查
+
+打开面板后先看 `部署自检`：
+
+| 项目 | 应该看到 |
+| --- | --- |
+| `ADMIN_TOKEN` | 已设置或有安全提醒 |
+| `D1 binding` | `pass` |
+| `D1 tables` | `pass` |
+| `DNS variables` | 不用 DNS 自动化时可以是 `info` |
+
+如果 `D1 binding` 或 `D1 tables` 失败，先回到第 3、4 步检查。
+
+## 9. 第一次进面板
 
 1. 输入 `ADMIN_TOKEN` 登录。
 2. 看 `部署自检`，确认 D1 通过。
@@ -94,6 +107,26 @@ npm run deploy
 4. 填入口路径，例如 `hk`。
 5. 点 `一键创建并复制`。
 6. Emby 客户端服务器地址填复制出来的 `https://你的域名/hk`。
+
+## 10. DNS 自动化注意
+
+点 `写入 CF DNS` 前一定先点 `预览 DNS`。
+
+面板会：
+
+- 删除 `CF_DOMAIN` 当前已有的 `A/AAAA/CNAME`。
+- 创建你勾选的 IP 或域名。
+- 保留 `TXT/MX` 等其他类型记录。
+
+支持输入：
+
+| 输入 | 记录 |
+| --- | --- |
+| `8.8.8.8` | `A` |
+| `2001:db8::1` | `AAAA` |
+| `cdn.example.com` | `CNAME` |
+
+内网 IP、错误 IP、带空格的坏域名会被拒绝。
 
 ## Cloudflare 导入入口
 
