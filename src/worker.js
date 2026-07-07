@@ -379,6 +379,7 @@ async function handleRoutesApi(request, env) {
   if (request.method === "POST") {
     const body = normalizeRoute(await readJson(request));
     validateRoute(body);
+    body.target = splitTargets(body.target).join("\n");
     if (body.oldPrefix && body.oldPrefix !== body.prefix) {
       await env.DB.prepare("DELETE FROM routes WHERE prefix = ?").bind(body.oldPrefix).run();
     }
@@ -424,10 +425,19 @@ async function handleImportRoutes(request, env) {
   const routes = Array.isArray(body) ? body : body.routes;
   if (!Array.isArray(routes)) return json({ success: false, error: "导入内容必须是数组" }, 400);
 
-  const statements = [];
-  routes.forEach((item, index) => {
+  const normalizedRoutes = routes.map((item, index) => {
     const route = normalizeRoute(item);
-    if (!route.prefix || !route.target) return;
+    try {
+      validateRoute(route);
+    } catch (error) {
+      throw badRequest(`第 ${index + 1} 条路径无效：${error.message || error}`);
+    }
+    route.target = splitTargets(route.target).join("\n");
+    return route;
+  });
+
+  const statements = [];
+  normalizedRoutes.forEach((route, index) => {
     statements.push(
       env.DB.prepare(`
         INSERT INTO routes(prefix, target, mode, remark, icon, cacheImages, order_idx, access_policy)
@@ -2306,7 +2316,7 @@ async function readJson(request) {
   try {
     return await request.json();
   } catch {
-    return {};
+    throw badRequest("JSON 格式不正确");
   }
 }
 

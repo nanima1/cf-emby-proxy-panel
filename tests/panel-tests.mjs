@@ -128,6 +128,76 @@ async function testInvalidRouteReturnsBadRequest() {
   assert.match(data.error, /上游地址/);
 }
 
+function createDbMock() {
+  const db = {
+    batchCalls: [],
+    prepared: [],
+    exec: async () => undefined,
+    prepare(sql) {
+      const statement = {
+        sql,
+        values: [],
+        bind(...values) {
+          this.values = values;
+          db.prepared.push(this);
+          return this;
+        },
+      };
+      return statement;
+    },
+    async batch(statements) {
+      this.batchCalls.push(statements);
+      return [];
+    },
+  };
+  return db;
+}
+
+async function testImportRoutesValidation() {
+  const invalidDb = createDbMock();
+  const invalid = await worker.fetch(
+    new Request("https://panel.test/api/routes/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ routes: [{ prefix: "bad", target: "https://" }] }),
+    }),
+    { DB: invalidDb },
+    {},
+  );
+  assert.equal(invalid.status, 400);
+  assert.equal(invalidDb.batchCalls.length, 0);
+  assert.match((await invalid.json()).error, /第 1 条路径无效/);
+
+  const validDb = createDbMock();
+  const valid = await worker.fetch(
+    new Request("https://panel.test/api/routes/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ routes: [{ prefix: "ok", target: "https://a.example.com/, http://b.example.com:8096/" }] }),
+    }),
+    { DB: validDb },
+    {},
+  );
+  assert.equal(valid.status, 200);
+  assert.equal((await valid.json()).imported, 1);
+  assert.equal(validDb.batchCalls.length, 1);
+  assert.equal(validDb.prepared.at(-1).values[1], "https://a.example.com\nhttp://b.example.com:8096");
+}
+
+async function testInvalidJsonReturnsBadRequest() {
+  const response = await worker.fetch(
+    new Request("https://panel.test/api/routes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    }),
+    { DB: { exec: async () => undefined } },
+    {},
+  );
+  assert.equal(response.status, 400);
+  assert.match((await response.json()).error, /JSON 格式不正确/);
+}
+
 function testMarkdownLinks() {
   const files = [
     "README.md",
@@ -150,5 +220,7 @@ function testMarkdownLinks() {
 
 await testPanelScriptAndRouteHelpers();
 await testInvalidRouteReturnsBadRequest();
+await testImportRoutesValidation();
+await testInvalidJsonReturnsBadRequest();
 testMarkdownLinks();
 console.log("PANEL_TESTS_OK");
