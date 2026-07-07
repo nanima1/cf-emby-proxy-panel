@@ -139,6 +139,7 @@ async function handleApi(request, env, ctx) {
     return json({
       success: true,
       version: VERSION,
+      protected: Boolean(getAdminToken(env)),
       hasDb: Boolean(env.DB),
       hasDnsEnv: Boolean(env.CF_API_TOKEN && env.CF_ZONE_ID && env.CF_DOMAIN),
       cfDomain: env.CF_DOMAIN || "",
@@ -1022,13 +1023,14 @@ function panelPage(env) {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Emby Proxy Panel</title>
 <style>
-:root{--bg:#f6f7f4;--panel:#fffdf7;--ink:#202124;--muted:#68706a;--line:#d9ded4;--blue:#2563eb;--green:#14804a;--red:#d12b2b;--orange:#c26a16;--shadow:0 18px 45px rgba(30,42,35,.08)}
-*{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#f7f8f2 0,#edf5f2 42%,#f8f1e5 100%);color:var(--ink);font-family:"Segoe UI","Microsoft YaHei",sans-serif}.wrap{max-width:1280px;margin:0 auto;padding:24px}.top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:20px}.title h1{margin:0;font-size:28px}.title p{margin:6px 0 0;color:var(--muted)}.grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(360px,.8fr);gap:18px}.card{background:rgba(255,253,247,.9);border:1px solid var(--line);box-shadow:var(--shadow);border-radius:8px;padding:18px}.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}.btn{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:7px;padding:10px 13px;font-weight:700;cursor:pointer}.btn:hover{border-color:#8b9b8e}.btn:disabled{opacity:.55;cursor:not-allowed}.primary{background:var(--blue);color:#fff;border-color:var(--blue)}.danger{color:var(--red);border-color:#f1b4b4}.green{color:var(--green);border-color:#a6d5bb}.muted{color:var(--muted)}input,select,textarea{width:100%;border:1px solid var(--line);border-radius:7px;background:#fff;padding:10px 12px;font:inherit}textarea{min-height:76px;resize:vertical}.field{margin-bottom:12px}.field label{display:block;font-size:13px;font-weight:700;color:var(--muted);margin-bottom:6px}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.routes{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px}.route{border:1px solid var(--line);border-radius:8px;background:#fff;padding:14px;display:flex;flex-direction:column;gap:11px}.route-head{display:flex;justify-content:space-between;gap:10px}.prefix{font-size:20px;font-weight:800}.badge{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:999px;padding:3px 8px;font-size:12px;color:var(--muted);background:#fafafa}.target{font-family:Consolas,monospace;font-size:12px;word-break:break-all;color:#335}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}.ip-list{display:grid;gap:8px;max-height:280px;overflow:auto}.ip-item{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;border:1px solid var(--line);border-radius:7px;padding:9px;background:#fff}.ip-item code{font-size:13px}.toast{position:fixed;left:50%;top:-80px;transform:translateX(-50%);background:#202124;color:#fff;border-radius:999px;padding:12px 18px;transition:.25s;z-index:10}.toast.show{top:18px}.empty{border:1px dashed var(--line);border-radius:8px;padding:26px;text-align:center;color:var(--muted)}.footer{margin-top:18px;color:var(--muted);font-size:13px}.split{display:flex;align-items:center;justify-content:space-between;gap:12px}.switch{display:flex;gap:8px;align-items:center}.switch input{width:auto}.small{font-size:12px}.status-line{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.doctor{margin-bottom:18px}.doctor-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-top:12px}.doctor-item{min-width:0;border:1px solid var(--line);border-radius:8px;background:#fff;padding:11px;display:grid;grid-template-columns:70px 1fr;gap:10px;align-items:start}.doctor-item.pass{border-color:#a6d5bb}.doctor-item.warn,.doctor-item.info{border-color:#efd0a8}.doctor-item.fail{border-color:#f1b4b4}.doctor-level{font-weight:800;font-size:12px;text-transform:uppercase}.doctor-item.pass .doctor-level{color:var(--green)}.doctor-item.warn .doctor-level{color:var(--orange)}.doctor-item.info .doctor-level{color:var(--muted)}.doctor-item.fail .doctor-level{color:var(--red)}.doctor-message{overflow-wrap:anywhere}.doctor-action{margin-top:4px;color:var(--muted);font-size:12px;overflow-wrap:anywhere}.wizard{margin-bottom:18px}.wizard[hidden]{display:none}.wizard-grid{display:grid;grid-template-columns:minmax(260px,.8fr) minmax(320px,1.2fr);gap:14px;margin-top:12px}.wizard-steps{display:grid;gap:8px}.wizard-step{border:1px solid var(--line);border-radius:8px;background:#fff;padding:10px;display:flex;justify-content:space-between;gap:10px;align-items:center}.wizard-step strong{overflow-wrap:anywhere}.wizard-form{display:grid;gap:10px}.wizard-form .row{align-items:end}
+:root{--bg:#eef3f7;--panel:rgba(255,255,255,.62);--panel-strong:rgba(255,255,255,.78);--ink:#1d2430;--muted:#657284;--line:rgba(255,255,255,.58);--line-strong:rgba(118,136,158,.28);--blue:#2563eb;--green:#14804a;--red:#d12b2b;--orange:#c26a16;--shadow:0 24px 70px rgba(31,45,61,.14);--inner:inset 0 1px 0 rgba(255,255,255,.68)}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:linear-gradient(135deg,#edf4f8 0,#f6f1e6 48%,#e8f3ed 100%);background-attachment:fixed;color:var(--ink);font-family:"Segoe UI","Microsoft YaHei",sans-serif}body::before{content:"";position:fixed;inset:0;pointer-events:none;background-image:linear-gradient(rgba(255,255,255,.22) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.22) 1px,transparent 1px);background-size:56px 56px;opacity:.45}.wrap{position:relative;z-index:1;max-width:1280px;margin:0 auto;padding:24px}.top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:20px;padding:18px;border:1px solid var(--line);border-radius:8px;background:linear-gradient(135deg,rgba(255,255,255,.74),rgba(255,255,255,.44));box-shadow:var(--shadow),var(--inner);backdrop-filter:blur(18px) saturate(150%);-webkit-backdrop-filter:blur(18px) saturate(150%)}.title h1{margin:0;font-size:28px}.title p{margin:6px 0 0;color:var(--muted)}.grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(360px,.8fr);gap:18px}.card{background:linear-gradient(135deg,rgba(255,255,255,.7),rgba(255,255,255,.48));border:1px solid var(--line);box-shadow:var(--shadow),var(--inner);backdrop-filter:blur(18px) saturate(145%);-webkit-backdrop-filter:blur(18px) saturate(145%);border-radius:8px;padding:18px}.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}.btn{border:1px solid var(--line-strong);background:rgba(255,255,255,.72);color:var(--ink);border-radius:7px;padding:10px 13px;font-weight:700;cursor:pointer;box-shadow:0 8px 22px rgba(31,45,61,.07);transition:border-color .18s,background .18s,box-shadow .18s,transform .18s}.btn:hover{border-color:rgba(37,99,235,.45);background:rgba(255,255,255,.9);box-shadow:0 12px 28px rgba(31,45,61,.11);transform:translateY(-1px)}.btn:disabled{opacity:.55;cursor:not-allowed;transform:none}.primary{background:linear-gradient(135deg,#2563eb,#1d4ed8);color:#fff;border-color:rgba(37,99,235,.5)}.danger{color:var(--red);border-color:rgba(209,43,43,.28);background:rgba(255,245,245,.72)}.green{color:var(--green);border-color:rgba(20,128,74,.3);background:rgba(241,252,246,.72)}.muted{color:var(--muted)}input,select,textarea{width:100%;border:1px solid var(--line-strong);border-radius:7px;background:rgba(255,255,255,.76);padding:10px 12px;font:inherit;color:var(--ink);box-shadow:inset 0 1px 0 rgba(255,255,255,.7)}input:focus,select:focus,textarea:focus{outline:2px solid rgba(37,99,235,.18);border-color:rgba(37,99,235,.55);background:rgba(255,255,255,.94)}textarea{min-height:76px;resize:vertical}.field{margin-bottom:12px}.field label{display:block;font-size:13px;font-weight:700;color:var(--muted);margin-bottom:6px}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.routes{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px}.route{border:1px solid var(--line);border-radius:8px;background:linear-gradient(180deg,rgba(255,255,255,.82),rgba(255,255,255,.58));box-shadow:0 14px 32px rgba(31,45,61,.08),var(--inner);padding:14px;display:flex;flex-direction:column;gap:11px}.route-head{display:flex;justify-content:space-between;gap:10px}.prefix{font-size:20px;font-weight:800}.badge{display:inline-flex;align-items:center;border:1px solid var(--line-strong);border-radius:999px;padding:3px 8px;font-size:12px;color:var(--muted);background:rgba(255,255,255,.62);box-shadow:inset 0 1px 0 rgba(255,255,255,.6)}.target{font-family:Consolas,monospace;font-size:12px;word-break:break-all;color:#334155}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}.ip-list{display:grid;gap:8px;max-height:280px;overflow:auto}.ip-item{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;border:1px solid var(--line);border-radius:7px;padding:9px;background:rgba(255,255,255,.66);box-shadow:var(--inner)}.ip-item code{font-size:13px}.toast{position:fixed;left:50%;top:-80px;transform:translateX(-50%);background:rgba(29,36,48,.92);color:#fff;border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:12px 18px;transition:.25s;z-index:10;box-shadow:0 18px 40px rgba(31,45,61,.22);backdrop-filter:blur(14px)}.toast.show{top:18px}.empty{border:1px dashed var(--line-strong);border-radius:8px;padding:26px;text-align:center;color:var(--muted);background:rgba(255,255,255,.38)}.footer{position:relative;z-index:1;margin-top:18px;color:var(--muted);font-size:13px}.split{display:flex;align-items:center;justify-content:space-between;gap:12px}.switch{display:flex;gap:8px;align-items:center}.switch input{width:auto}.small{font-size:12px}.status-line{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.doctor{margin-bottom:18px}.doctor-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-top:12px}.doctor-item{min-width:0;border:1px solid var(--line);border-radius:8px;background:rgba(255,255,255,.64);box-shadow:var(--inner);padding:11px;display:grid;grid-template-columns:70px 1fr;gap:10px;align-items:start}.doctor-item.pass{border-color:rgba(20,128,74,.28)}.doctor-item.warn,.doctor-item.info{border-color:rgba(194,106,22,.28)}.doctor-item.fail{border-color:rgba(209,43,43,.3)}.doctor-level{font-weight:800;font-size:12px;text-transform:uppercase}.doctor-item.pass .doctor-level{color:var(--green)}.doctor-item.warn .doctor-level{color:var(--orange)}.doctor-item.info .doctor-level{color:var(--muted)}.doctor-item.fail .doctor-level{color:var(--red)}.doctor-message{overflow-wrap:anywhere}.doctor-action{margin-top:4px;color:var(--muted);font-size:12px;overflow-wrap:anywhere}.wizard{margin-bottom:18px}.wizard[hidden]{display:none}.wizard-grid{display:grid;grid-template-columns:minmax(260px,.8fr) minmax(320px,1.2fr);gap:14px;margin-top:12px}.wizard-steps{display:grid;gap:8px}.wizard-step{border:1px solid var(--line);border-radius:8px;background:rgba(255,255,255,.64);box-shadow:var(--inner);padding:10px;display:flex;justify-content:space-between;gap:10px;align-items:center}.wizard-step strong{overflow-wrap:anywhere}.wizard-form{display:grid;gap:10px}.wizard-form .row{align-items:end}
 .wizard-step{display:grid;grid-template-columns:1fr auto;gap:6px 10px;justify-content:normal}
-.dns-preview{display:grid;gap:8px;margin:8px 0 12px}.dns-preview[hidden]{display:none}.dns-plan{border:1px solid var(--line);border-radius:8px;background:#fff;padding:10px}.dns-plan h3{font-size:14px;margin:0 0 8px}.dns-records{display:grid;gap:6px}.dns-record{display:grid;grid-template-columns:64px 1fr;gap:8px;align-items:center;font-size:12px}.dns-record code{word-break:break-all}
+.dns-preview{display:grid;gap:8px;margin:8px 0 12px}.dns-preview[hidden]{display:none}.dns-plan{border:1px solid var(--line);border-radius:8px;background:rgba(255,255,255,.62);box-shadow:var(--inner);padding:10px}.dns-plan h3{font-size:14px;margin:0 0 8px}.dns-records{display:grid;gap:6px}.dns-record{display:grid;grid-template-columns:64px 1fr;gap:8px;align-items:center;font-size:12px}.dns-record code{word-break:break-all}
 .version-card{margin-bottom:18px}
 .access-card{margin-bottom:18px}.access-list{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
-.stats{margin-bottom:18px}.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:12px}.stat-box{border:1px solid var(--line);border-radius:8px;background:#fff;padding:12px}.stat-value{font-size:26px;font-weight:800}.stat-list{display:grid;gap:7px}.stat-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;border:1px solid var(--line);border-radius:7px;padding:8px;background:#fff}
+.snapshot-card{margin-bottom:18px}
+.stats{margin-bottom:18px}.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:12px}.stat-box{border:1px solid var(--line);border-radius:8px;background:rgba(255,255,255,.6);box-shadow:var(--inner);padding:12px}.stat-value{font-size:26px;font-weight:800;color:#172033}.stat-list{display:grid;gap:7px}.stat-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;border:1px solid var(--line);border-radius:7px;padding:8px;background:rgba(255,255,255,.58);box-shadow:var(--inner)}
 @media(max-width:900px){.grid,.wizard-grid{grid-template-columns:1fr}.wrap{padding:14px}.top{flex-direction:column}.row{grid-template-columns:1fr}.routes{grid-template-columns:1fr}}
 </style>
 </head>
@@ -1078,6 +1080,16 @@ function panelPage(env) {
       </div>
     </div>
     <div id="accessGrid" class="stat-grid"></div>
+  </section>
+  <section class="card snapshot-card" id="snapshotCard">
+    <div class="split">
+      <div>
+        <strong>运维快照</strong>
+        <p class="small muted" id="snapshotSummary">汇总面板保护、D1、DNS、路由和统计状态。</p>
+      </div>
+      <button class="btn" onclick="copySnapshot()">复制快照</button>
+    </div>
+    <div id="snapshotGrid" class="stat-grid"></div>
   </section>
   <section class="card wizard" id="wizardCard" hidden>
     <div class="split">
@@ -1171,6 +1183,7 @@ let envState = {};
 let doctorState = null;
 let versionState = null;
 let routeHealth = {};
+let statsState = [];
 let wizardDismissed = false;
 const $ = (id) => document.getElementById(id);
 function toast(msg){ const el=$("toast"); el.textContent=msg; el.classList.add("show"); setTimeout(()=>el.classList.remove("show"),2600); }
@@ -1247,6 +1260,7 @@ async function boot(){
   $("dbBadge").textContent = envState.hasDb ? "D1 已绑定" : "D1 未绑定";
   $("dnsBadge").textContent = envState.hasDnsEnv ? "DNS 已配置: " + envState.cfDomain : "DNS 未配置";
   renderAccessControl();
+  renderSnapshot();
   loadVersionCheck();
   await loadDoctor();
   await loadRoutes();
@@ -1267,6 +1281,7 @@ function renderAccessControl(){
     accessBox("阻止国家", countries.length ? countries.join(", ") : "未设置", countries)+
     accessBox("客户端关键词", clientList.length+" 个", clientList.slice(0, 12))+
     '<div class="stat-box" style="grid-column:1 / -1"><strong>路由级浏览器访问</strong><p class="small muted" style="margin-bottom:0">编辑路由时可选 proxy/status/block；路由级设置优先于全局 BROWSER_MODE。</p></div>';
+  renderSnapshot();
 }
 function accessBox(label, value, chips){
   return '<div class="stat-box"><div class="small muted">'+escapeHtml(label)+'</div><div class="stat-value" style="font-size:20px">'+escapeHtml(value)+'</div><div class="access-list">'+(chips || []).map(item => '<span class="badge">'+escapeHtml(item)+'</span>').join("")+'</div></div>';
@@ -1286,10 +1301,12 @@ async function loadVersionCheck(){
       '<span class="badge">当前 '+escapeHtml(data.version || "")+'</span>'+
       '<span class="badge">'+escapeHtml(stateText)+'</span>'+
       '<a class="badge" href="'+escapeAttr(data.latestUrl || data.repo || "#")+'" target="_blank" rel="noopener noreferrer">'+escapeHtml(data.latestShortSha || "GitHub")+'</a>';
+    renderSnapshot();
   } catch(e) {
     versionState = null;
     summary.textContent = "版本检查暂时不可用。";
     info.innerHTML = '<span class="badge">当前 '+escapeHtml(envState.version || "${VERSION}")+'</span><span class="badge">'+escapeHtml(e.message)+'</span>';
+    renderSnapshot();
   }
 }
 async function loadStats(){
@@ -1299,14 +1316,18 @@ async function loadStats(){
   grid.innerHTML = '<div class="empty">正在读取统计...</div>';
   try {
     const data = await api("/api/stats");
+    statsState = data.result || [];
     renderStats(data.result || []);
   } catch(e) {
+    statsState = [];
     if(summary) summary.textContent = "统计不可用。";
     grid.innerHTML = '<div class="empty">'+escapeHtml(e.message)+'</div>';
+    renderSnapshot();
   }
 }
 function renderStats(rows){
   const list = Array.isArray(rows) ? rows : [];
+  statsState = list;
   const total = list.reduce((sum, item) => sum + Number(item.totalReqs || 0), 0);
   const active = list.filter(item => Number(item.totalReqs || 0) > 0).length;
   const lastDate = list.map(item => item.lastDate || "").filter(Boolean).sort().pop() || "-";
@@ -1318,6 +1339,7 @@ function renderStats(rows){
     statBox("路由数量", routes.length)+
     statBox("最近日期", lastDate)+
     '<div class="stat-box" style="grid-column:1 / -1"><strong>热门路径</strong><div class="stat-list" style="margin-top:10px">'+(top.length ? top.map(statRow).join("") : '<div class="small muted">暂无排行</div>')+'</div></div>';
+  renderSnapshot();
 }
 function statBox(label, value){
   return '<div class="stat-box"><div class="small muted">'+escapeHtml(label)+'</div><div class="stat-value">'+escapeHtml(value)+'</div></div>';
@@ -1326,7 +1348,7 @@ function statRow(item){
   return '<div class="stat-row"><strong>/'+escapeHtml(item.prefix || "-")+'</strong><span class="badge">'+Number(item.totalReqs || 0)+' 次</span></div>';
 }
 async function loadRoutes(){
-  try { routes = await api("/api/routes"); renderRoutes(); renderWizard(); } catch(e){ routes = []; $("routes").innerHTML = '<div class="empty">'+e.message+'</div>'; renderWizard(e.message); }
+  try { routes = await api("/api/routes"); renderRoutes(); renderWizard(); renderSnapshot(); } catch(e){ routes = []; $("routes").innerHTML = '<div class="empty">'+e.message+'</div>'; renderWizard(e.message); renderSnapshot(); }
 }
 function renderRoutes(){
   const q = $("search").value.trim().toLowerCase();
@@ -1372,6 +1394,69 @@ function routeCard(r){
 }
 function routeTargets(route){
   return String(route.target || "").split(",").map(x => x.trim()).filter(Boolean);
+}
+function renderSnapshot(){
+  const grid = $("snapshotGrid");
+  if(!grid) return;
+  const routeCount = routes.length;
+  const upstreamCount = routes.reduce((sum, route) => sum + routeTargets(route).length, 0);
+  const stats = Array.isArray(statsState) ? statsState : [];
+  const totalReqs = stats.reduce((sum, item) => sum + Number(item.totalReqs || 0), 0);
+  const lastDate = stats.map(item => item.lastDate || "").filter(Boolean).sort().pop() || "-";
+  const protectedText = envState.protected ? "已设置" : "未设置";
+  const dnsText = envState.hasDnsEnv ? (envState.cfDomain || "已配置") : "未配置";
+  const defaultTargetText = envState.defaultTarget ? "已设置" : "未设置";
+  const latestText = versionState?.latestShortSha || "未检查";
+  $("snapshotSummary").textContent = "当前共有 "+routeCount+" 条路径、"+upstreamCount+" 个上游，累计播放 "+totalReqs+" 次。";
+  grid.innerHTML =
+    statBox("面板保护", protectedText)+
+    statBox("D1 绑定", envState.hasDb ? "已绑定" : "未绑定")+
+    statBox("DNS 自动化", dnsText)+
+    statBox("默认上游", defaultTargetText)+
+    statBox("路由数量", routeCount)+
+    statBox("上游数量", upstreamCount)+
+    statBox("累计播放", totalReqs)+
+    statBox("最近统计", lastDate)+
+    statBox("浏览器模式", envState.browserMode || "proxy")+
+    statBox("最新提交", latestText);
+}
+async function copySnapshot(){
+  if(!routes.length && envState.hasDb) {
+    try { routes = await api("/api/routes"); } catch {}
+  }
+  const stats = Array.isArray(statsState) ? statsState : [];
+  const totalReqs = stats.reduce((sum, item) => sum + Number(item.totalReqs || 0), 0);
+  const lastDate = stats.map(item => item.lastDate || "").filter(Boolean).sort().pop() || "-";
+  const countries = Array.isArray(envState.blockedCountries) ? envState.blockedCountries : [];
+  const customClients = Array.isArray(envState.blockedClients) ? envState.blockedClients : [];
+  const defaultClients = Array.isArray(envState.defaultBlockedClients) ? envState.defaultBlockedClients : [];
+  const routeLines = routes.length
+    ? routes.map(r => "- /"+r.prefix+" | mode="+(r.mode || "clean")+" | upstreams="+routeTargets(r).length+" | browser="+((r.accessPolicy && r.accessPolicy.browserMode) || "proxy")).join("\\n")
+    : "- none";
+  const lines = [
+    "CF Emby Proxy Panel Snapshot",
+    "Generated: "+new Date().toISOString(),
+    "Page: "+location.origin,
+    "Version: "+(envState.version || ""),
+    "Latest: "+(versionState?.latestShortSha || "unknown"),
+    "Protected: "+(envState.protected ? "yes" : "no"),
+    "D1: "+(envState.hasDb ? "bound" : "missing"),
+    "DNS: "+(envState.hasDnsEnv ? (envState.cfDomain || "configured") : "not configured"),
+    "Default target: "+(envState.defaultTarget ? "set" : "empty"),
+    "Browser mode: "+(envState.browserMode || "proxy"),
+    "Blocked countries: "+(countries.join(", ") || "none"),
+    "Blocked client keywords: "+(customClients.length || defaultClients.length),
+    "Routes: "+routes.length,
+    "Upstreams: "+routes.reduce((sum, route) => sum + routeTargets(route).length, 0),
+    "Total play requests: "+totalReqs,
+    "Last stats date: "+lastDate,
+    "",
+    "Route summary:",
+    routeLines,
+  ];
+  await navigator.clipboard.writeText(lines.join("\\n"));
+  toast("运维快照已复制");
+  renderSnapshot();
 }
 function routeHealthBadge(prefix){
   const item = routeHealth[prefix];
@@ -1561,7 +1646,7 @@ async function updateDns(){
 }
 async function copyText(text){ await navigator.clipboard.writeText(text); toast("已复制"); }
 async function logout(){ await api("/api/logout", { method:"POST" }); location.reload(); }
-function escapeHtml(s){ return String(s||"").replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;","'":"&#39;"}[m])); }
+function escapeHtml(s){ return String(s ?? "").replace(/[&<>"']/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;","'":"&#39;"}[m])); }
 function escapeAttr(s){ return escapeHtml(s).replace(/\\\\/g,"\\\\\\\\").replace(/'/g,"\\\\'"); }
 boot();
 </script>
