@@ -599,6 +599,30 @@ npx wrangler d1 execute cf-emby-proxy-panel --remote --file=./schema.sql
 - 面板保存不了路径：优先看 `D1 binding` 和 `D1 tables`，这两项必须是 `pass`。
 - 优选 IP 写入 DNS 失败：优先看 `DNS variables` 和 `Cloudflare DNS API`。
 
+## 路由配置怎么备份和恢复
+
+建议在下面几种情况先点一次 `导出配置`：
+
+- 已经添加了很多 `/hk`、`/home`、`/jp` 路径。
+- 准备改 D1、改 Worker、重新部署。
+- 准备批量导入别人给你的配置。
+
+导出：
+
+1. 进入面板。
+2. 点路径列表上方的 `导出配置`。
+3. 浏览器会下载一个 `emby-routes-日期.json` 文件。
+4. 把这个 JSON 放到 D 盘、网盘或其他安全位置。
+
+恢复：
+
+1. 进入面板。
+2. 点 `导入配置`。
+3. 选择之前导出的 JSON 文件。
+4. 确认导入。
+
+注意：导入时如果 JSON 里有同名路径，比如都是 `hk`，会覆盖面板里原来的 `/hk` 配置；不同名路径会新增。
+
 ## 常见问题
 
 ### 面板打开后提示 D1 未绑定
@@ -669,6 +693,7 @@ npx wrangler d1 execute cf-emby-proxy-panel --remote --file=./schema.sql
 - D1 binding 名是 `DB`。
 - 已执行 `schema.sql`。
 - 已设置 `ADMIN_TOKEN`。
+- 已点 `导出配置` 备份重要路由。
 - `npm run check` 通过。
 - `npm run dry-run` 通过。
 - `npm run deploy` 成功。

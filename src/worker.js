@@ -958,6 +958,9 @@ function panelPage(env) {
       <div class="toolbar">
         <button class="btn primary" onclick="newRoute()">新增路径</button>
         <button class="btn" onclick="loadRoutes()">刷新</button>
+        <button class="btn" onclick="exportRoutes()">导出配置</button>
+        <button class="btn" onclick="pickImportFile()">导入配置</button>
+        <input id="importFile" type="file" accept="application/json,.json" onchange="importRoutesFile(event)" hidden>
         <input id="search" placeholder="搜索路径/备注/上游" oninput="renderRoutes()" style="max-width:260px">
       </div>
       <div id="routes" class="routes"></div>
@@ -1092,6 +1095,53 @@ function routeCard(r){
   const targets = (r.target || "").split(",").filter(Boolean).length;
   const url = location.origin + "/" + r.prefix;
   return '<article class="route"><div class="route-head"><div><div class="prefix">'+escapeHtml(r.icon || "🎞️")+" /"+escapeHtml(r.prefix)+'</div><div class="muted small">'+escapeHtml(r.remark || "无备注")+'</div></div><span class="badge">'+escapeHtml(r.mode || "clean")+'</span></div><div class="target">'+escapeHtml(r.target)+'</div><div class="status-line"><span class="badge">'+targets+' 个上游</span><span class="badge">今日播放 '+(r.todayReqs||0)+'</span><span class="badge">'+(r.cacheImages ? "缓存开" : "缓存关")+'</span></div><div class="actions"><button class="btn" onclick="copyText(\\''+url+'\\')">复制入口</button><button class="btn" onclick="pingRoute(\\''+escapeAttr(r.prefix)+'\\')">测速</button><button class="btn" onclick="editRoute(\\''+escapeAttr(r.prefix)+'\\')">编辑</button><button class="btn danger" onclick="deleteRoute(\\''+escapeAttr(r.prefix)+'\\')">删除</button></div></article>';
+}
+function exportRoutes(){
+  if(!routes.length) return toast("还没有可导出的路径");
+  const payload = {
+    app:"cf-emby-proxy-panel",
+    version:"${VERSION}",
+    exportedAt:new Date().toISOString(),
+    routes:routes.map(r => ({
+      prefix:r.prefix,
+      target:r.target,
+      mode:r.mode || "clean",
+      remark:r.remark || "",
+      icon:r.icon || "",
+      cacheImages:!!r.cacheImages,
+      order_idx:r.order_idx || 0,
+      accessPolicy:r.accessPolicy || {},
+    })),
+  };
+  const blob = new Blob([JSON.stringify(payload,null,2)], { type:"application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "emby-routes-"+new Date().toISOString().slice(0,10)+".json";
+  document.body.appendChild(a);
+  a.click();
+  URL.revokeObjectURL(a.href);
+  a.remove();
+  toast("配置已导出");
+}
+function pickImportFile(){
+  $("importFile").value = "";
+  $("importFile").click();
+}
+async function importRoutesFile(event){
+  const file = event.target.files && event.target.files[0];
+  if(!file) return;
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    const list = Array.isArray(data) ? data : data.routes;
+    if(!Array.isArray(list) || !list.length) return toast("没有找到 routes 配置");
+    if(!confirm("确认导入 "+list.length+" 条路径？同名路径会被覆盖。")) return;
+    const result = await api("/api/routes/import", { method:"POST", body:JSON.stringify({ routes:list }) });
+    toast("已导入 "+(result.imported || 0)+" 条路径");
+    await loadRoutes();
+  } catch(e) {
+    toast("导入失败: "+e.message);
+  }
 }
 function newRoute(){ $("routeForm").reset(); $("oldPrefix").value=""; $("cacheImages").checked=true; $("mode").value="clean"; $("browserMode").value="proxy"; $("prefix").focus(); }
 function editRoute(prefix){
