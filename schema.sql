@@ -16,3 +16,9 @@ CREATE TABLE IF NOT EXISTS request_stats (
   count INTEGER DEFAULT 0,
   PRIMARY KEY(prefix, date)
 );
+
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);

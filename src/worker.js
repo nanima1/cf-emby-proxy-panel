@@ -20,6 +20,8 @@ const COOKIE_NAME = "emby_panel_auth";
 const SESSION_TTL = 60 * 60 * 24 * 7;
 const DEFAULT_MODE = "clean";
 const DEFAULT_BROWSER_MODE = "proxy";
+const APPEARANCE_SETTING_KEY = "appearance";
+const DEFAULT_APPEARANCE = { backgroundUrl: "", backgroundOpacity: 28 };
 const IP_SOURCE_URLS = {
   proxyip: "https://www.nslookup.io/domains/cdn-all.xn--b6gac.eu.org/dns-records/",
   bestcf: "https://addressesapi.090227.xyz/CloudFlareYes",
@@ -175,6 +177,10 @@ async function handleApi(request, env, ctx) {
     return handleStatsApi(env);
   }
 
+  if (url.pathname === "/api/settings/appearance") {
+    return handleAppearanceSettingsApi(request, env);
+  }
+
   if (url.pathname === "/api/ping") {
     const target = url.searchParams.get("url");
     return json({ success: true, ms: await measureDelay(target) });
@@ -266,11 +272,12 @@ async function handleDoctorApi(env) {
       await ensureSchema(env.DB);
       const routeCount = await env.DB.prepare("SELECT COUNT(*) AS count FROM routes").first();
       const statCount = await env.DB.prepare("SELECT COUNT(*) AS count FROM request_stats").first();
+      const settingCount = await env.DB.prepare("SELECT COUNT(*) AS count FROM settings").first();
       add(
         "dbSchema",
         "D1 tables",
         "pass",
-        `routes: ${Number(routeCount?.count || 0)}, request_stats: ${Number(statCount?.count || 0)}.`,
+        `routes: ${Number(routeCount?.count || 0)}, request_stats: ${Number(statCount?.count || 0)}, settings: ${Number(settingCount?.count || 0)}.`,
       );
     } catch (error) {
       add(
@@ -470,6 +477,67 @@ async function handleStatsApi(env) {
     ORDER BY totalReqs DESC
   `).all();
   return json({ success: true, result: rows.results || [] });
+}
+
+async function handleAppearanceSettingsApi(request, env) {
+  requireDb(env);
+  await ensureSchema(env.DB);
+
+  if (request.method === "GET") {
+    const row = await env.DB.prepare("SELECT value, updated_at FROM settings WHERE key = ?").bind(APPEARANCE_SETTING_KEY).first();
+    let appearance;
+    try {
+      appearance = normalizeAppearanceSetting(safeJson(row?.value, DEFAULT_APPEARANCE), false);
+    } catch {
+      appearance = DEFAULT_APPEARANCE;
+    }
+    return json({ success: true, appearance: { ...appearance, updatedAt: row?.updated_at || "" } });
+  }
+
+  if (request.method === "POST") {
+    const body = await readJson(request);
+    let appearance;
+    try {
+      appearance = normalizeAppearanceSetting(body, true);
+    } catch (error) {
+      return json({ success: false, error: error.message || "外观配置无效" }, 400);
+    }
+    const updatedAt = new Date().toISOString();
+    await env.DB.prepare(`
+      INSERT INTO settings(key, value, updated_at)
+      VALUES(?, ?, ?)
+      ON CONFLICT(key) DO UPDATE SET
+        value = excluded.value,
+        updated_at = excluded.updated_at
+    `).bind(APPEARANCE_SETTING_KEY, JSON.stringify(appearance), updatedAt).run();
+    return json({ success: true, appearance: { ...appearance, updatedAt } });
+  }
+
+  return json({ success: false, error: "Method not allowed" }, 405);
+}
+
+function normalizeAppearanceSetting(input = {}, strict = false) {
+  const backgroundUrl = String(input.backgroundUrl || input.bgUrl || "").trim();
+  if (backgroundUrl.length > 2048) throw new Error("背景 URL 太长，请使用图床直链或随机图 API 地址");
+  if (backgroundUrl) {
+    let parsed;
+    try {
+      parsed = new URL(backgroundUrl);
+    } catch {
+      throw new Error("背景 URL 格式不正确");
+    }
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      throw new Error("背景只保存 http/https 图片或随机图 API URL，不保存图片文件本体");
+    }
+  }
+
+  const opacity = Number(input.backgroundOpacity ?? input.opacity ?? DEFAULT_APPEARANCE.backgroundOpacity);
+  if (!Number.isFinite(opacity)) {
+    if (strict) throw new Error("背景可见度必须是数字");
+    return { ...DEFAULT_APPEARANCE, backgroundUrl };
+  }
+  const backgroundOpacity = Math.max(0, Math.min(70, Math.round(opacity)));
+  return { backgroundUrl, backgroundOpacity };
 }
 
 async function proxyByRoute(request, env, ctx) {
@@ -976,6 +1044,11 @@ async function ensureSchema(db) {
       count INTEGER DEFAULT 0,
       PRIMARY KEY(prefix, date)
     );
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
   const migrations = [
@@ -1032,6 +1105,7 @@ function panelPage(env) {
 .snapshot-card{margin-bottom:18px}
 .stats{margin-bottom:18px}.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:12px}.stat-box{border:1px solid var(--line);border-radius:8px;background:rgba(255,255,255,.6);box-shadow:var(--inner);padding:12px}.stat-value{font-size:26px;font-weight:800;color:#172033}.stat-list{display:grid;gap:7px}.stat-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;border:1px solid var(--line);border-radius:7px;padding:8px;background:rgba(255,255,255,.58);box-shadow:var(--inner)}
 .quick-card{border:1px solid var(--line);border-radius:8px;background:rgba(255,255,255,.56);box-shadow:var(--inner);padding:12px;margin:0 0 14px}.quick-card h3{font-size:16px;margin:0 0 6px}.quick-result{border:1px dashed rgba(37,99,235,.35);border-radius:8px;background:rgba(239,246,255,.62);padding:10px;margin-top:10px}.quick-url{display:block;margin:6px 0 10px;font-family:Consolas,monospace;font-size:13px;word-break:break-all;color:#1d4ed8}.route{position:relative;transition:transform .18s,box-shadow .18s,opacity .18s}.routes.dragging .route{cursor:grabbing}.route.dragging{opacity:.55;transform:scale(.985)}.route.drag-before::before,.route.drag-after::after{content:"";position:absolute;left:12px;right:12px;height:3px;border-radius:999px;background:#2563eb;box-shadow:0 0 0 4px rgba(37,99,235,.13)}.route.drag-before::before{top:-8px}.route.drag-after::after{bottom:-8px}.prefix-row{display:flex;align-items:center;gap:8px}.drag-handle{display:inline-grid;place-items:center;width:26px;height:26px;border:1px solid var(--line-strong);border-radius:7px;background:rgba(255,255,255,.68);color:var(--muted);cursor:grab;user-select:none;font-weight:800}.route.dragging .drag-handle{cursor:grabbing}
+body::after{content:"";position:fixed;inset:0;pointer-events:none;background-image:var(--custom-bg);background-size:cover;background-position:center;background-repeat:no-repeat;opacity:var(--custom-bg-opacity,0);filter:saturate(1.1) contrast(1.02);transition:opacity .25s;z-index:0}.appearance-card{position:relative;overflow:hidden}.appearance-card::before{content:"";position:absolute;inset:0;background:linear-gradient(135deg,rgba(37,99,235,.08),rgba(20,128,74,.06));pointer-events:none}.appearance-card>*{position:relative}.bg-preview{height:78px;border:1px solid var(--line);border-radius:8px;background:linear-gradient(135deg,#edf4f8,#f6f1e6);background-image:var(--custom-bg);background-size:cover;background-position:center;box-shadow:var(--inner);margin-top:10px}.range-row{display:grid;grid-template-columns:1fr 54px;gap:10px;align-items:center}.range-row input{padding:0}.route-placeholder{border:1px dashed rgba(37,99,235,.5);border-radius:8px;background:rgba(37,99,235,.08);box-shadow:inset 0 0 0 1px rgba(255,255,255,.45);min-height:112px}.route.drag-source{display:none}.route-drag-ghost{position:fixed;left:0;top:0;z-index:30;pointer-events:none;margin:0;box-shadow:0 28px 68px rgba(31,45,61,.22),var(--inner);transform:translate3d(0,0,0) rotate(.2deg);opacity:.96;will-change:transform}.routes.dragging{user-select:none}.routes.dragging .route:not(.drag-source){transition:transform .12s,box-shadow .12s}
 @media(max-width:900px){.grid,.wizard-grid{grid-template-columns:1fr}.wrap{padding:14px}.top{flex-direction:column}.row{grid-template-columns:1fr}.routes{grid-template-columns:1fr}}
 </style>
 </head>
@@ -1158,6 +1232,18 @@ function panelPage(env) {
           <div class="small muted">确认无误后，点下面的“保存路径”。</div>
         </div>
       </section>
+      <section class="quick-card appearance-card">
+        <h3>外观背景</h3>
+        <p class="small muted">支持图床直链或随机图 API，配置会保存到 D1 的 settings 表。</p>
+        <div class="field"><label>背景图片 / 图床 API URL</label><input id="bgUrl" placeholder="https://example.com/background.jpg"></div>
+        <div class="field"><label>背景可见度</label><div class="range-row"><input id="bgOpacity" type="range" min="0" max="70" value="28" oninput="previewBackgroundOpacity()"><span class="badge" id="bgOpacityLabel">28%</span></div></div>
+        <div class="toolbar" style="margin-bottom:0">
+          <button class="btn primary" type="button" onclick="applyBackground()">应用背景</button>
+          <button class="btn" type="button" onclick="refreshBackground()">刷新随机图</button>
+          <button class="btn" type="button" onclick="resetBackground()">恢复默认</button>
+        </div>
+        <div class="bg-preview" id="bgPreview"></div>
+      </section>
       <form id="routeForm" onsubmit="saveRoute(event)">
         <input id="oldPrefix" type="hidden">
         <div class="row">
@@ -1203,7 +1289,7 @@ let doctorState = null;
 let versionState = null;
 let routeHealth = {};
 let statsState = [];
-let draggedPrefix = "";
+let routePointerDrag = null;
 let wizardDismissed = false;
 const $ = (id) => document.getElementById(id);
 function toast(msg){ const el=$("toast"); el.textContent=msg; el.classList.add("show"); setTimeout(()=>el.classList.remove("show"),2600); }
@@ -1277,6 +1363,7 @@ function buildDoctorReport(data){
 }
 async function boot(){
   envState = await api("/api/env");
+  await loadAppearance();
   $("dbBadge").textContent = envState.hasDb ? "D1 已绑定" : "D1 未绑定";
   $("dnsBadge").textContent = envState.hasDnsEnv ? "DNS 已配置: " + envState.cfDomain : "DNS 未配置";
   renderAccessControl();
@@ -1411,7 +1498,7 @@ function routeCard(r){
   const targets = routeTargets(r).length;
   const url = location.origin + "/" + r.prefix;
   const safePrefix = escapeAttr(r.prefix);
-  return '<article class="route" draggable="true" data-prefix="'+safePrefix+'" ondragstart="startRouteDrag(event,\\''+safePrefix+'\\')" ondragover="overRouteDrag(event,\\''+safePrefix+'\\')" ondragleave="leaveRouteDrag(event)" ondrop="dropRoute(event,\\''+safePrefix+'\\')" ondragend="endRouteDrag()"><div class="route-head"><div><div class="prefix-row"><span class="drag-handle" title="拖动排序" aria-label="拖动排序">↕</span><div class="prefix">'+escapeHtml(r.icon || "🎞️")+" /"+escapeHtml(r.prefix)+'</div></div><div class="muted small">'+escapeHtml(r.remark || "无备注")+'</div></div><span class="badge">'+escapeHtml(r.mode || "clean")+'</span></div><div class="target">'+escapeHtml(r.target)+'</div><div class="status-line"><span class="badge">'+targets+' 个上游</span>'+routeHealthBadge(r.prefix)+'<span class="badge">今日播放 '+(r.todayReqs||0)+'</span><span class="badge">'+(r.cacheImages ? "缓存开" : "缓存关")+'</span></div><div class="actions"><button class="btn" onclick="copyText(\\''+url+'\\')">复制入口</button><button class="btn" onclick="pingRoute(\\''+safePrefix+'\\')">测速</button><button class="btn" onclick="moveRoute(\\''+safePrefix+'\\',-1)">上移</button><button class="btn" onclick="moveRoute(\\''+safePrefix+'\\',1)">下移</button><button class="btn" onclick="editRoute(\\''+safePrefix+'\\')">编辑</button><button class="btn danger" onclick="deleteRoute(\\''+safePrefix+'\\')">删除</button></div></article>';
+  return '<article class="route" data-prefix="'+safePrefix+'"><div class="route-head"><div><div class="prefix-row"><span class="drag-handle" title="按住拖动排序" aria-label="按住拖动排序" onpointerdown="beginRoutePointerDrag(event,\\''+safePrefix+'\\')">↕</span><div class="prefix">'+escapeHtml(r.icon || "🎞️")+" /"+escapeHtml(r.prefix)+'</div></div><div class="muted small">'+escapeHtml(r.remark || "无备注")+'</div></div><span class="badge">'+escapeHtml(r.mode || "clean")+'</span></div><div class="target">'+escapeHtml(r.target)+'</div><div class="status-line"><span class="badge">'+targets+' 个上游</span>'+routeHealthBadge(r.prefix)+'<span class="badge">今日播放 '+(r.todayReqs||0)+'</span><span class="badge">'+(r.cacheImages ? "缓存开" : "缓存关")+'</span></div><div class="actions"><button class="btn" onclick="copyText(\\''+url+'\\')">复制入口</button><button class="btn" onclick="pingRoute(\\''+safePrefix+'\\')">测速</button><button class="btn" onclick="moveRoute(\\''+safePrefix+'\\',-1)">上移</button><button class="btn" onclick="moveRoute(\\''+safePrefix+'\\',1)">下移</button><button class="btn" onclick="editRoute(\\''+safePrefix+'\\')">编辑</button><button class="btn danger" onclick="deleteRoute(\\''+safePrefix+'\\')">删除</button></div></article>';
 }
 function routeTargets(route){
   return String(route.target || "").split(",").map(x => x.trim()).filter(Boolean);
@@ -1466,6 +1553,100 @@ async function copyQuickProxyUrl(){
   if(!url) return;
   await navigator.clipboard.writeText(url);
   toast("反代地址已复制");
+}
+function normalizeBackgroundUrl(value, cacheBust=false){
+  const raw = String(value || "").trim();
+  if(!raw) return "";
+  const parsed = new URL(raw, location.href);
+  if(!["http:", "https:"].includes(parsed.protocol)) throw new Error("背景地址只支持 http/https 图片或随机图 API URL");
+  if(cacheBust) parsed.searchParams.set("_cfbg", Date.now().toString());
+  return parsed.toString();
+}
+function cssImageUrl(url){
+  return "url("+JSON.stringify(String(url))+")";
+}
+function setBackground(url, opacityValue){
+  const opacity = Math.max(0, Math.min(70, Number(opacityValue || 0)));
+  const root = document.documentElement;
+  const preview = $("bgPreview");
+  if(url) {
+    root.style.setProperty("--custom-bg", cssImageUrl(url));
+    root.style.setProperty("--custom-bg-opacity", String(opacity / 100));
+    document.body.classList.add("custom-bg");
+    if(preview) preview.style.backgroundImage = cssImageUrl(url);
+  } else {
+    root.style.removeProperty("--custom-bg");
+    root.style.setProperty("--custom-bg-opacity", "0");
+    document.body.classList.remove("custom-bg");
+    if(preview) preview.style.backgroundImage = "";
+  }
+  if($("bgOpacity")) $("bgOpacity").value = String(opacity);
+  if($("bgOpacityLabel")) $("bgOpacityLabel").textContent = opacity+"%";
+}
+async function loadAppearance(){
+  if(!envState.hasDb) {
+    setBackground("", 28);
+    if($("bgUrl")) $("bgUrl").placeholder = "需要先绑定 D1 才能保存背景";
+    return;
+  }
+  try {
+    const data = await api("/api/settings/appearance");
+    const appearance = data.appearance || {};
+    const url = appearance.backgroundUrl || "";
+    const opacity = appearance.backgroundOpacity ?? 28;
+    if($("bgUrl")) $("bgUrl").value = url;
+    setBackground(url, opacity);
+  } catch(e) {
+    setBackground("", 28);
+    if($("bgUrl")) $("bgUrl").placeholder = "读取背景配置失败，可重新保存";
+    toast("背景配置读取失败: "+e.message);
+  }
+}
+function previewBackgroundOpacity(){
+  const opacity = $("bgOpacity")?.value || "28";
+  if($("bgOpacityLabel")) $("bgOpacityLabel").textContent = opacity+"%";
+  document.documentElement.style.setProperty("--custom-bg-opacity", String(Number(opacity) / 100));
+}
+async function applyBackground(){
+  try {
+    const raw = $("bgUrl").value;
+    const url = normalizeBackgroundUrl(raw, false);
+    if(!url) return await resetBackground();
+    const opacity = $("bgOpacity").value || "28";
+    await saveAppearance({ backgroundUrl: raw.trim(), backgroundOpacity: Number(opacity) });
+    setBackground(url, opacity);
+    toast("背景已保存到 D1");
+  } catch(e) {
+    toast(e.message || "背景地址无效");
+  }
+}
+async function refreshBackground(){
+  try {
+    const raw = $("bgUrl").value;
+    const url = normalizeBackgroundUrl(raw, true);
+    if(!url) return toast("先填写背景图片或随机图 API");
+    const opacity = $("bgOpacity").value || "28";
+    await saveAppearance({ backgroundUrl: raw.trim(), backgroundOpacity: Number(opacity) });
+    setBackground(url, opacity);
+    toast("背景已刷新并保存");
+  } catch(e) {
+    toast(e.message || "背景刷新失败");
+  }
+}
+async function resetBackground(){
+  try {
+    await saveAppearance({ backgroundUrl:"", backgroundOpacity:28 });
+  } catch(e) {
+    toast("背景配置保存失败: "+e.message);
+    return;
+  }
+  if($("bgUrl")) $("bgUrl").value = "";
+  setBackground("", 28);
+  toast("已恢复默认背景并保存");
+}
+async function saveAppearance(appearance){
+  if(!envState.hasDb) throw new Error("需要先绑定 D1，背景配置会保存到 settings 表");
+  return api("/api/settings/appearance", { method:"POST", body:JSON.stringify(appearance) });
 }
 function renderSnapshot(){
   const grid = $("snapshotGrid");
@@ -1618,67 +1799,111 @@ async function moveRoute(prefix, direction){
 async function saveRouteOrder(){
   await api("/api/routes/reorder", { method:"POST", body:JSON.stringify(routes.map(r => r.prefix)) });
 }
-function startRouteDrag(event, prefix){
-  draggedPrefix = prefix;
-  if(event.dataTransfer) {
-    event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("text/plain", prefix);
-  }
-  event.currentTarget.classList.add("dragging");
-  $("routes")?.classList.add("dragging");
-}
-function overRouteDrag(event, prefix){
-  if(!draggedPrefix || draggedPrefix === prefix) return;
+function beginRoutePointerDrag(event, prefix){
+  if(event.button !== undefined && event.button !== 0) return;
+  const source = event.currentTarget.closest(".route");
+  const container = $("routes");
+  if(!source || !container) return;
   event.preventDefault();
-  clearDragTargets();
-  const rect = event.currentTarget.getBoundingClientRect();
-  const after = event.clientY > rect.top + rect.height / 2;
-  event.currentTarget.classList.add(after ? "drag-after" : "drag-before");
-  if(event.dataTransfer) event.dataTransfer.dropEffect = "move";
+  const rect = source.getBoundingClientRect();
+  const placeholder = document.createElement("div");
+  placeholder.className = "route-placeholder";
+  placeholder.style.height = rect.height+"px";
+  placeholder.style.width = rect.width+"px";
+  source.after(placeholder);
+
+  const ghost = source.cloneNode(true);
+  ghost.classList.add("route-drag-ghost");
+  ghost.style.width = rect.width+"px";
+  ghost.style.minHeight = rect.height+"px";
+  document.body.appendChild(ghost);
+
+  source.classList.add("drag-source");
+  container.classList.add("dragging");
+  routePointerDrag = {
+    prefix,
+    source,
+    placeholder,
+    ghost,
+    container,
+    offsetX:event.clientX - rect.left,
+    offsetY:event.clientY - rect.top,
+    previous:routes.slice(),
+  };
+  moveRouteDragGhost(event);
+  document.addEventListener("pointermove", moveRoutePointerDrag);
+  document.addEventListener("pointerup", finishRoutePointerDrag);
+  document.addEventListener("pointercancel", cancelRoutePointerDrag);
 }
-function leaveRouteDrag(event){
-  event.currentTarget.classList.remove("drag-before", "drag-after");
+function moveRouteDragGhost(event){
+  if(!routePointerDrag?.ghost) return;
+  const x = event.clientX - routePointerDrag.offsetX;
+  const y = event.clientY - routePointerDrag.offsetY;
+  routePointerDrag.ghost.style.transform = "translate3d("+x+"px,"+y+"px,0) rotate(.2deg)";
 }
-async function dropRoute(event, targetPrefix){
+function moveRoutePointerDrag(event){
+  if(!routePointerDrag) return;
   event.preventDefault();
-  const sourcePrefix = event.dataTransfer?.getData("text/plain") || draggedPrefix;
-  const after = event.currentTarget.classList.contains("drag-after");
-  clearDragTargets();
-  await reorderDraggedRoute(sourcePrefix, targetPrefix, after);
-  endRouteDrag();
-}
-function endRouteDrag(){
-  draggedPrefix = "";
-  clearDragTargets();
-  document.querySelectorAll(".route.dragging").forEach(el => el.classList.remove("dragging"));
-  $("routes")?.classList.remove("dragging");
-}
-function clearDragTargets(){
-  document.querySelectorAll(".route.drag-before,.route.drag-after").forEach(el => el.classList.remove("drag-before", "drag-after"));
-}
-async function reorderDraggedRoute(sourcePrefix, targetPrefix, after){
-  if(!sourcePrefix || !targetPrefix || sourcePrefix === targetPrefix) return;
-  const previous = routes.slice();
-  const from = routes.findIndex(x => x.prefix === sourcePrefix);
-  if(from < 0) return;
-  const item = routes.splice(from, 1)[0];
-  let insertIndex = routes.findIndex(x => x.prefix === targetPrefix);
-  if(insertIndex < 0) {
-    routes = previous;
+  moveRouteDragGhost(event);
+  const { container, placeholder, source, ghost } = routePointerDrag;
+  ghost.hidden = true;
+  const below = document.elementFromPoint(event.clientX, event.clientY);
+  ghost.hidden = false;
+  const target = below?.closest?.(".route");
+  if(target && target.parentElement === container && target !== source) {
+    const rect = target.getBoundingClientRect();
+    if(event.clientY > rect.top + rect.height / 2) target.after(placeholder);
+    else target.before(placeholder);
     return;
   }
-  if(after) insertIndex += 1;
-  routes.splice(insertIndex, 0, item);
+  const containerRect = container.getBoundingClientRect();
+  if(event.clientY > containerRect.bottom - 24) container.appendChild(placeholder);
+  if(event.clientY < containerRect.top + 24) container.prepend(placeholder);
+}
+async function finishRoutePointerDrag(event){
+  if(!routePointerDrag) return;
+  event?.preventDefault?.();
+  const state = routePointerDrag;
+  const orderedPrefixes = Array.from(state.container.children)
+    .filter(el => el !== state.source)
+    .map(el => el.classList.contains("route-placeholder") ? state.prefix : el.dataset?.prefix)
+    .filter(Boolean);
+  cleanupRoutePointerDrag();
+  const changed = orderedPrefixes.join("|") !== state.previous.map(route => route.prefix).join("|");
+  if(!changed) {
+    renderRoutes();
+    return;
+  }
+  const byPrefix = new Map(state.previous.map(route => [route.prefix, route]));
+  routes = orderedPrefixes.map(prefix => byPrefix.get(prefix)).filter(Boolean);
   routes.forEach((route, order) => { route.order_idx = order; });
   renderRoutes();
   try {
     await saveRouteOrder();
     toast("拖动排序已保存");
   } catch(e) {
-    routes = previous;
+    routes = state.previous;
     renderRoutes();
     toast("排序保存失败: "+e.message);
   }
+}
+function cancelRoutePointerDrag(){
+  if(!routePointerDrag) return;
+  const previous = routePointerDrag.previous;
+  cleanupRoutePointerDrag();
+  routes = previous;
+  renderRoutes();
+}
+function cleanupRoutePointerDrag(){
+  if(!routePointerDrag) return;
+  document.removeEventListener("pointermove", moveRoutePointerDrag);
+  document.removeEventListener("pointerup", finishRoutePointerDrag);
+  document.removeEventListener("pointercancel", cancelRoutePointerDrag);
+  routePointerDrag.source?.classList.remove("drag-source");
+  routePointerDrag.placeholder?.remove();
+  routePointerDrag.ghost?.remove();
+  routePointerDrag.container?.classList.remove("dragging");
+  routePointerDrag = null;
 }
 async function deleteRoute(prefix){ if(!confirm("删除 /"+prefix+" ?")) return; await api("/api/routes?prefix="+encodeURIComponent(prefix), { method:"DELETE" }); toast("已删除"); await loadRoutes(); await loadStats(); }
 async function pingRoute(prefix){
