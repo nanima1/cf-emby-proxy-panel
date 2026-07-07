@@ -963,6 +963,7 @@ function panelPage(env) {
 *{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#f7f8f2 0,#edf5f2 42%,#f8f1e5 100%);color:var(--ink);font-family:"Segoe UI","Microsoft YaHei",sans-serif}.wrap{max-width:1280px;margin:0 auto;padding:24px}.top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:20px}.title h1{margin:0;font-size:28px}.title p{margin:6px 0 0;color:var(--muted)}.grid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(360px,.8fr);gap:18px}.card{background:rgba(255,253,247,.9);border:1px solid var(--line);box-shadow:var(--shadow);border-radius:8px;padding:18px}.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}.btn{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:7px;padding:10px 13px;font-weight:700;cursor:pointer}.btn:hover{border-color:#8b9b8e}.btn:disabled{opacity:.55;cursor:not-allowed}.primary{background:var(--blue);color:#fff;border-color:var(--blue)}.danger{color:var(--red);border-color:#f1b4b4}.green{color:var(--green);border-color:#a6d5bb}.muted{color:var(--muted)}input,select,textarea{width:100%;border:1px solid var(--line);border-radius:7px;background:#fff;padding:10px 12px;font:inherit}textarea{min-height:76px;resize:vertical}.field{margin-bottom:12px}.field label{display:block;font-size:13px;font-weight:700;color:var(--muted);margin-bottom:6px}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.routes{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px}.route{border:1px solid var(--line);border-radius:8px;background:#fff;padding:14px;display:flex;flex-direction:column;gap:11px}.route-head{display:flex;justify-content:space-between;gap:10px}.prefix{font-size:20px;font-weight:800}.badge{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:999px;padding:3px 8px;font-size:12px;color:var(--muted);background:#fafafa}.target{font-family:Consolas,monospace;font-size:12px;word-break:break-all;color:#335}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}.ip-list{display:grid;gap:8px;max-height:280px;overflow:auto}.ip-item{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center;border:1px solid var(--line);border-radius:7px;padding:9px;background:#fff}.ip-item code{font-size:13px}.toast{position:fixed;left:50%;top:-80px;transform:translateX(-50%);background:#202124;color:#fff;border-radius:999px;padding:12px 18px;transition:.25s;z-index:10}.toast.show{top:18px}.empty{border:1px dashed var(--line);border-radius:8px;padding:26px;text-align:center;color:var(--muted)}.footer{margin-top:18px;color:var(--muted);font-size:13px}.split{display:flex;align-items:center;justify-content:space-between;gap:12px}.switch{display:flex;gap:8px;align-items:center}.switch input{width:auto}.small{font-size:12px}.status-line{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.doctor{margin-bottom:18px}.doctor-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-top:12px}.doctor-item{min-width:0;border:1px solid var(--line);border-radius:8px;background:#fff;padding:11px;display:grid;grid-template-columns:70px 1fr;gap:10px;align-items:start}.doctor-item.pass{border-color:#a6d5bb}.doctor-item.warn,.doctor-item.info{border-color:#efd0a8}.doctor-item.fail{border-color:#f1b4b4}.doctor-level{font-weight:800;font-size:12px;text-transform:uppercase}.doctor-item.pass .doctor-level{color:var(--green)}.doctor-item.warn .doctor-level{color:var(--orange)}.doctor-item.info .doctor-level{color:var(--muted)}.doctor-item.fail .doctor-level{color:var(--red)}.doctor-message{overflow-wrap:anywhere}.doctor-action{margin-top:4px;color:var(--muted);font-size:12px;overflow-wrap:anywhere}.wizard{margin-bottom:18px}.wizard[hidden]{display:none}.wizard-grid{display:grid;grid-template-columns:minmax(260px,.8fr) minmax(320px,1.2fr);gap:14px;margin-top:12px}.wizard-steps{display:grid;gap:8px}.wizard-step{border:1px solid var(--line);border-radius:8px;background:#fff;padding:10px;display:flex;justify-content:space-between;gap:10px;align-items:center}.wizard-step strong{overflow-wrap:anywhere}.wizard-form{display:grid;gap:10px}.wizard-form .row{align-items:end}
 .wizard-step{display:grid;grid-template-columns:1fr auto;gap:6px 10px;justify-content:normal}
 .dns-preview{display:grid;gap:8px;margin:8px 0 12px}.dns-preview[hidden]{display:none}.dns-plan{border:1px solid var(--line);border-radius:8px;background:#fff;padding:10px}.dns-plan h3{font-size:14px;margin:0 0 8px}.dns-records{display:grid;gap:6px}.dns-record{display:grid;grid-template-columns:64px 1fr;gap:8px;align-items:center;font-size:12px}.dns-record code{word-break:break-all}
+.stats{margin-bottom:18px}.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:12px}.stat-box{border:1px solid var(--line);border-radius:8px;background:#fff;padding:12px}.stat-value{font-size:26px;font-weight:800}.stat-list{display:grid;gap:7px}.stat-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;border:1px solid var(--line);border-radius:7px;padding:8px;background:#fff}
 @media(max-width:900px){.grid,.wizard-grid{grid-template-columns:1fr}.wrap{padding:14px}.top{flex-direction:column}.row{grid-template-columns:1fr}.routes{grid-template-columns:1fr}}
 </style>
 </head>
@@ -1016,6 +1017,16 @@ function panelPage(env) {
         </div>
       </form>
     </div>
+  </section>
+  <section class="card stats" id="statsCard">
+    <div class="split">
+      <div>
+        <strong>播放统计</strong>
+        <p class="small muted" id="statsSummary">正在读取播放统计。</p>
+      </div>
+      <button class="btn" onclick="loadStats()">刷新统计</button>
+    </div>
+    <div id="statsGrid" class="stat-grid"></div>
   </section>
   <section class="grid">
     <div class="card">
@@ -1148,6 +1159,40 @@ async function boot(){
   $("dnsBadge").textContent = envState.hasDnsEnv ? "DNS 已配置: " + envState.cfDomain : "DNS 未配置";
   await loadDoctor();
   await loadRoutes();
+  await loadStats();
+}
+async function loadStats(){
+  const grid = $("statsGrid");
+  const summary = $("statsSummary");
+  if(!grid) return;
+  grid.innerHTML = '<div class="empty">正在读取统计...</div>';
+  try {
+    const data = await api("/api/stats");
+    renderStats(data.result || []);
+  } catch(e) {
+    if(summary) summary.textContent = "统计不可用。";
+    grid.innerHTML = '<div class="empty">'+escapeHtml(e.message)+'</div>';
+  }
+}
+function renderStats(rows){
+  const list = Array.isArray(rows) ? rows : [];
+  const total = list.reduce((sum, item) => sum + Number(item.totalReqs || 0), 0);
+  const active = list.filter(item => Number(item.totalReqs || 0) > 0).length;
+  const lastDate = list.map(item => item.lastDate || "").filter(Boolean).sort().pop() || "-";
+  const top = list.slice(0, 5);
+  $("statsSummary").textContent = total ? "累计播放请求 "+total+" 次，最近记录 "+lastDate+"。" : "还没有播放统计，客户端访问后会自动记录。";
+  $("statsGrid").innerHTML =
+    statBox("累计播放", total)+
+    statBox("活跃路径", active)+
+    statBox("路由数量", routes.length)+
+    statBox("最近日期", lastDate)+
+    '<div class="stat-box" style="grid-column:1 / -1"><strong>热门路径</strong><div class="stat-list" style="margin-top:10px">'+(top.length ? top.map(statRow).join("") : '<div class="small muted">暂无排行</div>')+'</div></div>';
+}
+function statBox(label, value){
+  return '<div class="stat-box"><div class="small muted">'+escapeHtml(label)+'</div><div class="stat-value">'+escapeHtml(value)+'</div></div>';
+}
+function statRow(item){
+  return '<div class="stat-row"><strong>/'+escapeHtml(item.prefix || "-")+'</strong><span class="badge">'+Number(item.totalReqs || 0)+' 次</span></div>';
 }
 async function loadRoutes(){
   try { routes = await api("/api/routes"); renderRoutes(); renderWizard(); } catch(e){ routes = []; $("routes").innerHTML = '<div class="empty">'+e.message+'</div>'; renderWizard(e.message); }
@@ -1247,6 +1292,7 @@ async function importRoutesFile(event){
     const result = await api("/api/routes/import", { method:"POST", body:JSON.stringify({ routes:list }) });
     toast("已导入 "+(result.imported || 0)+" 条路径");
     await loadRoutes();
+    await loadStats();
   } catch(e) {
     toast("导入失败: "+e.message);
   }
@@ -1261,7 +1307,7 @@ async function saveRoute(e){
   e.preventDefault();
   const body = { oldPrefix:$("oldPrefix").value, prefix:$("prefix").value, target:$("target").value, mode:$("mode").value, icon:$("icon").value, remark:$("remark").value, cacheImages:$("cacheImages").checked, accessPolicy:{ browserMode:$("browserMode").value } };
   await api("/api/routes", { method:"POST", body:JSON.stringify(body) });
-  toast("路径已保存"); newRoute(); await loadRoutes();
+  toast("路径已保存"); newRoute(); await loadRoutes(); await loadStats();
 }
 async function moveRoute(prefix, direction){
   const index = routes.findIndex(x => x.prefix === prefix);
@@ -1284,7 +1330,7 @@ async function moveRoute(prefix, direction){
 async function saveRouteOrder(){
   await api("/api/routes/reorder", { method:"POST", body:JSON.stringify(routes.map(r => r.prefix)) });
 }
-async function deleteRoute(prefix){ if(!confirm("删除 /"+prefix+" ?")) return; await api("/api/routes?prefix="+encodeURIComponent(prefix), { method:"DELETE" }); toast("已删除"); await loadRoutes(); }
+async function deleteRoute(prefix){ if(!confirm("删除 /"+prefix+" ?")) return; await api("/api/routes?prefix="+encodeURIComponent(prefix), { method:"DELETE" }); toast("已删除"); await loadRoutes(); await loadStats(); }
 async function pingRoute(prefix){
   const r = routes.find(x => x.prefix === prefix); if(!r) return;
   await pingOneRoute(r, true);
