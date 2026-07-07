@@ -1217,13 +1217,14 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;background-ima
       <section class="quick-card">
         <h3>小白生成器</h3>
         <p class="small muted">填原 Emby 地址和入口路径，自动生成客户端要填写的反代后地址。</p>
-        <div class="field"><label>Emby 原地址</label><input id="quickTarget" placeholder="https://emby.example.com:443"></div>
+        <div class="field"><label>Emby 原地址</label><input id="quickTarget" placeholder="https://emby.example.com:443" oninput="updateQuickProxyUrl()"></div>
         <div class="row">
           <div class="field"><label>入口路径</label><input id="quickPrefix" value="emby" placeholder="emby" oninput="updateQuickProxyUrl()"></div>
           <div class="field"><label>推荐模式</label><select id="quickMode"><option value="clean">clean</option><option value="origin">origin 前后端分离</option><option value="real-ip">real-ip</option><option value="direct">direct</option></select></div>
         </div>
         <div class="toolbar" style="margin-bottom:0">
           <button class="btn primary" type="button" onclick="generateBeginnerRoute()">生成并填入</button>
+          <button class="btn green" type="button" onclick="createBeginnerRoute()">一键创建并复制</button>
           <button class="btn" type="button" onclick="copyQuickProxyUrl()">复制反代地址</button>
         </div>
         <div class="quick-result" id="quickResult" hidden>
@@ -1239,6 +1240,7 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;background-ima
         <div class="field"><label>背景可见度</label><div class="range-row"><input id="bgOpacity" type="range" min="0" max="70" value="28" oninput="previewBackgroundOpacity()"><span class="badge" id="bgOpacityLabel">28%</span></div></div>
         <div class="toolbar" style="margin-bottom:0">
           <button class="btn primary" type="button" onclick="applyBackground()">应用背景</button>
+          <button class="btn" type="button" onclick="previewBackground()">预览不保存</button>
           <button class="btn" type="button" onclick="refreshBackground()">刷新随机图</button>
           <button class="btn" type="button" onclick="resetBackground()">恢复默认</button>
         </div>
@@ -1250,7 +1252,7 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;background-ima
           <div class="field"><label>路径前缀</label><input id="prefix" placeholder="hk / jp / home" required></div>
           <div class="field"><label>图标</label><input id="icon" placeholder="🎬"></div>
         </div>
-        <div class="field"><label>上游 Emby，可用逗号分隔做故障切换</label><textarea id="target" placeholder="https://emby.example.com:443" required></textarea></div>
+        <div class="field"><label>上游 Emby，可用逗号或换行分隔做故障切换</label><textarea id="target" placeholder="https://emby-a.example.com:443&#10;https://emby-b.example.com:443" required></textarea></div>
         <div class="row">
           <div class="field"><label>反代模式</label><select id="mode"><option value="clean">clean 隐藏真实 IP</option><option value="real-ip">real-ip 传递客户端 IP</option><option value="origin">origin 前后端分离</option><option value="direct">direct 尽量保留请求头</option></select></div>
           <div class="field"><label>浏览器访问</label><select id="browserMode"><option value="proxy">proxy 直接反代</option><option value="status">status 显示状态页</option><option value="block">block 阻止浏览器</option></select></div>
@@ -1501,7 +1503,10 @@ function routeCard(r){
   return '<article class="route" data-prefix="'+safePrefix+'"><div class="route-head"><div><div class="prefix-row"><span class="drag-handle" title="按住拖动排序" aria-label="按住拖动排序" onpointerdown="beginRoutePointerDrag(event,\\''+safePrefix+'\\')">↕</span><div class="prefix">'+escapeHtml(r.icon || "🎞️")+" /"+escapeHtml(r.prefix)+'</div></div><div class="muted small">'+escapeHtml(r.remark || "无备注")+'</div></div><span class="badge">'+escapeHtml(r.mode || "clean")+'</span></div><div class="target">'+escapeHtml(r.target)+'</div><div class="status-line"><span class="badge">'+targets+' 个上游</span>'+routeHealthBadge(r.prefix)+'<span class="badge">今日播放 '+(r.todayReqs||0)+'</span><span class="badge">'+(r.cacheImages ? "缓存开" : "缓存关")+'</span></div><div class="actions"><button class="btn" onclick="copyText(\\''+url+'\\')">复制入口</button><button class="btn" onclick="pingRoute(\\''+safePrefix+'\\')">测速</button><button class="btn" onclick="moveRoute(\\''+safePrefix+'\\',-1)">上移</button><button class="btn" onclick="moveRoute(\\''+safePrefix+'\\',1)">下移</button><button class="btn" onclick="editRoute(\\''+safePrefix+'\\')">编辑</button><button class="btn danger" onclick="deleteRoute(\\''+safePrefix+'\\')">删除</button></div></article>';
 }
 function routeTargets(route){
-  return String(route.target || "").split(",").map(x => x.trim()).filter(Boolean);
+  return String(route.target || "").split(new RegExp("[,\\\\n\\\\r]+")).map(x => x.trim()).filter(Boolean);
+}
+function routeExists(prefix, oldPrefix=""){
+  return routes.some(route => route.prefix === prefix && route.prefix !== oldPrefix);
 }
 function normalizeBeginnerPrefix(value){
   const cleaned = String(value || "emby").trim().replace(new RegExp("^/+"), "").replace(/[^a-zA-Z0-9_-]/g, "-").slice(0, 64);
@@ -1546,6 +1551,41 @@ function generateBeginnerRoute(){
     toast("已生成反代地址，确认后点保存路径");
   } catch(e) {
     toast(e.message || "生成失败");
+  }
+}
+async function createBeginnerRoute(){
+  try {
+    const prefix = normalizeBeginnerPrefix($("quickPrefix").value);
+    const target = normalizeBeginnerTarget($("quickTarget").value);
+    const mode = $("quickMode").value || "clean";
+    if(routeExists(prefix) && !confirm("/"+prefix+" 已存在，是否覆盖这条路由？")) return;
+    const body = {
+      oldPrefix:"",
+      prefix,
+      target,
+      mode,
+      icon:"",
+      remark:"小白生成",
+      cacheImages:true,
+      accessPolicy:{ browserMode:"status" },
+    };
+    await api("/api/routes", { method:"POST", body:JSON.stringify(body) });
+    $("quickPrefix").value = prefix;
+    $("oldPrefix").value = "";
+    $("prefix").value = prefix;
+    $("target").value = target;
+    $("mode").value = mode;
+    $("browserMode").value = "status";
+    $("icon").value = "";
+    $("remark").value = "小白生成";
+    $("cacheImages").checked = true;
+    const url = updateQuickProxyUrl(prefix);
+    try { await navigator.clipboard.writeText(url); } catch {}
+    await loadRoutes();
+    await loadStats();
+    toast("路由已创建，反代地址已复制");
+  } catch(e) {
+    toast(e.message || "一键创建失败");
   }
 }
 async function copyQuickProxyUrl(){
@@ -1606,6 +1646,21 @@ function previewBackgroundOpacity(){
   const opacity = $("bgOpacity")?.value || "28";
   if($("bgOpacityLabel")) $("bgOpacityLabel").textContent = opacity+"%";
   document.documentElement.style.setProperty("--custom-bg-opacity", String(Number(opacity) / 100));
+}
+function previewBackground(){
+  try {
+    const raw = $("bgUrl").value;
+    const opacity = $("bgOpacity").value || "28";
+    const url = normalizeBackgroundUrl(raw, true);
+    if(!url) {
+      setBackground("", 28);
+      return toast("已预览默认背景，未保存");
+    }
+    setBackground(url, opacity);
+    toast("背景已预览，未保存到 D1");
+  } catch(e) {
+    toast(e.message || "背景预览失败");
+  }
 }
 async function applyBackground(){
   try {
@@ -1775,6 +1830,9 @@ function editRoute(prefix){
 async function saveRoute(e){
   e.preventDefault();
   const body = { oldPrefix:$("oldPrefix").value, prefix:$("prefix").value, target:$("target").value, mode:$("mode").value, icon:$("icon").value, remark:$("remark").value, cacheImages:$("cacheImages").checked, accessPolicy:{ browserMode:$("browserMode").value } };
+  const clean = normalizeBeginnerPrefix(body.prefix);
+  if(routeExists(clean, body.oldPrefix) && !confirm("/"+clean+" 已存在，是否覆盖这条路由？")) return;
+  body.prefix = clean;
   await api("/api/routes", { method:"POST", body:JSON.stringify(body) });
   toast("路径已保存"); newRoute(); await loadRoutes(); await loadStats();
 }
@@ -2188,7 +2246,7 @@ function cleanPrefix(value) {
 }
 
 function splitTargets(value) {
-  return String(value || "").split(",").map((item) => stripTrailingSlash(item.trim())).filter(Boolean);
+  return String(value || "").split(/[,\n\r]+/).map((item) => stripTrailingSlash(item.trim())).filter(Boolean);
 }
 
 function splitList(value) {
