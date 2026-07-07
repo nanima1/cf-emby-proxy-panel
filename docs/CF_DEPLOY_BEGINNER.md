@@ -610,6 +610,16 @@ npx wrangler d1 execute cf-emby-proxy-panel --remote --file=./schema.sql
 
 如果你要找别人帮忙排错，先点 `复制报告`。它会复制版本号、D1/DNS 状态、检查结果和建议动作，不会复制 Cloudflare Token 或面板密码。
 
+## 访问控制卡片怎么看
+
+`访问控制` 卡片会显示当前全局规则：
+
+- `全局浏览器模式`：来自 `BROWSER_MODE`，可选 `proxy`、`status`、`block`。
+- `阻止国家`：来自 `BLOCKED_COUNTRIES`，例如 `JP,RU`。
+- `客户端关键词`：来自 `BLOCKED_CLIENTS`。如果你没设置，会显示默认脚本客户端关键词保护。
+
+每条路由编辑表单里的 `浏览器访问` 优先级更高。也就是说，如果全局是 `proxy`，但某条路由选了 `status`，浏览器打开这条路由时仍然会显示状态页。
+
 页面里还有 `项目版本` 卡片。它会尝试读取 GitHub main 分支最新提交：
 
 - 能显示最新提交，说明 Worker 可以访问 GitHub。

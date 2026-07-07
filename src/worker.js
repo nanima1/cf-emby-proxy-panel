@@ -144,6 +144,9 @@ async function handleApi(request, env, ctx) {
       cfDomain: env.CF_DOMAIN || "",
       defaultTarget: env.DEFAULT_TARGET || "",
       browserMode: getEnvBrowserMode(env),
+      blockedCountries: splitList(env.BLOCKED_COUNTRIES).map((item) => item.toUpperCase()),
+      blockedClients: splitList(env.BLOCKED_CLIENTS),
+      defaultBlockedClients: DEFAULT_BLOCKED_CLIENTS,
     });
   }
 
@@ -328,6 +331,16 @@ async function handleDoctorApi(env) {
       "If routes work normally, this warning can be ignored.",
     );
   }
+
+  const blockedCountries = splitList(env.BLOCKED_COUNTRIES).map((item) => item.toUpperCase());
+  const blockedClients = splitList(env.BLOCKED_CLIENTS);
+  add(
+    "accessControl",
+    "Access control",
+    blockedCountries.length || blockedClients.length || getEnvBrowserMode(env) !== DEFAULT_BROWSER_MODE ? "pass" : "info",
+    `browser: ${getEnvBrowserMode(env)}, countries: ${blockedCountries.length}, client keywords: ${blockedClients.length || DEFAULT_BLOCKED_CLIENTS.length}.`,
+    "Route-level browser mode can override BROWSER_MODE.",
+  );
 
   return json({
     success: true,
@@ -1014,6 +1027,7 @@ function panelPage(env) {
 .wizard-step{display:grid;grid-template-columns:1fr auto;gap:6px 10px;justify-content:normal}
 .dns-preview{display:grid;gap:8px;margin:8px 0 12px}.dns-preview[hidden]{display:none}.dns-plan{border:1px solid var(--line);border-radius:8px;background:#fff;padding:10px}.dns-plan h3{font-size:14px;margin:0 0 8px}.dns-records{display:grid;gap:6px}.dns-record{display:grid;grid-template-columns:64px 1fr;gap:8px;align-items:center;font-size:12px}.dns-record code{word-break:break-all}
 .version-card{margin-bottom:18px}
+.access-card{margin-bottom:18px}.access-list{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
 .stats{margin-bottom:18px}.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:12px}.stat-box{border:1px solid var(--line);border-radius:8px;background:#fff;padding:12px}.stat-value{font-size:26px;font-weight:800}.stat-list{display:grid;gap:7px}.stat-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;border:1px solid var(--line);border-radius:7px;padding:8px;background:#fff}
 @media(max-width:900px){.grid,.wizard-grid{grid-template-columns:1fr}.wrap{padding:14px}.top{flex-direction:column}.row{grid-template-columns:1fr}.routes{grid-template-columns:1fr}}
 </style>
@@ -1055,6 +1069,15 @@ function panelPage(env) {
       <button class="btn" onclick="loadVersionCheck()">检查更新</button>
     </div>
     <div id="versionInfo" class="status-line"></div>
+  </section>
+  <section class="card access-card" id="accessCard">
+    <div class="split">
+      <div>
+        <strong>访问控制</strong>
+        <p class="small muted" id="accessSummary">读取全局访问控制和浏览器访问模式。</p>
+      </div>
+    </div>
+    <div id="accessGrid" class="stat-grid"></div>
   </section>
   <section class="card wizard" id="wizardCard" hidden>
     <div class="split">
@@ -1205,6 +1228,9 @@ function buildDoctorReport(data){
     "CheckedAt: "+(data.checkedAt || ""),
     "D1 binding: "+(envState.hasDb ? "yes" : "no"),
     "DNS env: "+(envState.hasDnsEnv ? "yes" : "no"),
+    "Browser mode: "+(envState.browserMode || ""),
+    "Blocked countries: "+((envState.blockedCountries || []).join(", ") || "none"),
+    "Blocked client keywords: "+(((envState.blockedClients || []).length || (envState.defaultBlockedClients || []).length)),
     "Route count: "+routes.length,
     "Latest commit: "+(versionState?.latestShortSha || "unknown"),
     "",
@@ -1220,10 +1246,30 @@ async function boot(){
   envState = await api("/api/env");
   $("dbBadge").textContent = envState.hasDb ? "D1 已绑定" : "D1 未绑定";
   $("dnsBadge").textContent = envState.hasDnsEnv ? "DNS 已配置: " + envState.cfDomain : "DNS 未配置";
+  renderAccessControl();
   loadVersionCheck();
   await loadDoctor();
   await loadRoutes();
   await loadStats();
+}
+function renderAccessControl(){
+  const grid = $("accessGrid");
+  if(!grid) return;
+  const countries = Array.isArray(envState.blockedCountries) ? envState.blockedCountries : [];
+  const customClients = Array.isArray(envState.blockedClients) ? envState.blockedClients : [];
+  const defaultClients = Array.isArray(envState.defaultBlockedClients) ? envState.defaultBlockedClients : [];
+  const clientList = customClients.length ? customClients : defaultClients;
+  $("accessSummary").textContent = countries.length || customClients.length
+    ? "全局访问控制已配置；每条路由仍可单独设置浏览器访问模式。"
+    : "当前使用默认脚本客户端关键词保护；每条路由可单独设置浏览器访问模式。";
+  grid.innerHTML =
+    accessBox("全局浏览器模式", envState.browserMode || "proxy", ["proxy","status","block"])+
+    accessBox("阻止国家", countries.length ? countries.join(", ") : "未设置", countries)+
+    accessBox("客户端关键词", clientList.length+" 个", clientList.slice(0, 12))+
+    '<div class="stat-box" style="grid-column:1 / -1"><strong>路由级浏览器访问</strong><p class="small muted" style="margin-bottom:0">编辑路由时可选 proxy/status/block；路由级设置优先于全局 BROWSER_MODE。</p></div>';
+}
+function accessBox(label, value, chips){
+  return '<div class="stat-box"><div class="small muted">'+escapeHtml(label)+'</div><div class="stat-value" style="font-size:20px">'+escapeHtml(value)+'</div><div class="access-list">'+(chips || []).map(item => '<span class="badge">'+escapeHtml(item)+'</span>').join("")+'</div></div>';
 }
 async function loadVersionCheck(){
   const summary = $("versionSummary");
