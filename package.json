@@ -6,6 +6,7 @@
   "description": "Cloudflare Worker Emby reverse proxy panel with path routing, DNS automation, preferred IP tools, and D1 storage.",
   "scripts": {
     "check": "node --check src/worker.js",
+    "test": "node tests/panel-tests.mjs",
     "dry-run": "wrangler deploy --dry-run",
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",

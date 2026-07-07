@@ -59,7 +59,8 @@ export default {
     try {
       return await handleRequest(request, env, ctx);
     } catch (error) {
-      return json({ success: false, error: error.message || String(error) }, 500);
+      const status = Number(error.status || error.statusCode) || 500;
+      return json({ success: false, error: error.message || String(error) }, status);
     }
   },
 };
@@ -1495,11 +1496,15 @@ function dismissWizard(){
 async function saveWizardRoute(e){
   e.preventDefault();
   const prefix = $("wizardPrefix").value.trim() || "emby";
-  const target = $("wizardTarget").value.trim();
-  if(!target) return toast("先填写 Emby 上游地址");
-  await api("/api/routes", { method:"POST", body:JSON.stringify({ prefix, target, mode:$("wizardMode").value, remark:"首次向导", icon:"", cacheImages:true, accessPolicy:{ browserMode:"status" } }) });
-  toast("第一条路由已保存");
-  await loadRoutes();
+  try {
+    const target = normalizeRouteTargetsInput($("wizardTarget").value);
+    $("wizardTarget").value = target;
+    await api("/api/routes", { method:"POST", body:JSON.stringify({ prefix, target, mode:$("wizardMode").value, remark:"首次向导", icon:"", cacheImages:true, accessPolicy:{ browserMode:"status" } }) });
+    toast("第一条路由已保存");
+    await loadRoutes();
+  } catch(e) {
+    toast(e.message || "保存失败");
+  }
 }
 function routeCard(r){
   const targets = routeTargets(r).length;
@@ -1509,6 +1514,23 @@ function routeCard(r){
 }
 function routeTargets(route){
   return String(route.target || "").split(new RegExp("[,\\\\n\\\\r]+")).map(x => x.trim()).filter(Boolean);
+}
+function normalizeRouteTarget(value){
+  let input = String(value || "").trim();
+  if(!input) throw new Error("上游不能为空");
+  if(!new RegExp("^https?://", "i").test(input)) input = "https://" + input;
+  const url = new URL(input);
+  if(!["http:", "https:"].includes(url.protocol) || !url.hostname) throw new Error("上游地址格式不正确: "+value);
+  url.hash = "";
+  url.search = "";
+  if(url.pathname === "/web" || url.pathname.startsWith("/web/")) url.pathname = "/";
+  const normalized = url.toString();
+  return normalized.endsWith("/") ? normalized.slice(0, -1) : normalized;
+}
+function normalizeRouteTargetsInput(value){
+  const targets = routeTargets({ target:value });
+  if(!targets.length) throw new Error("先填写上游 Emby 地址");
+  return targets.map(normalizeRouteTarget).join("\\n");
 }
 function routeExists(prefix, oldPrefix=""){
   return routes.some(route => route.prefix === prefix && route.prefix !== oldPrefix);
@@ -1521,6 +1543,16 @@ function updateRoutePreview(){
   const rawPrefix = $("prefix")?.value || "";
   const rawTarget = $("target")?.value || "";
   const targets = routeTargets({ target: rawTarget });
+  let targetError = "";
+  if(rawPrefix.trim() && !targets.length) {
+    targetError = "先填写上游 Emby 地址";
+  } else {
+    try {
+      if(targets.length) normalizeRouteTargetsInput(rawTarget);
+    } catch(e) {
+      targetError = e.message || "上游地址格式不正确";
+    }
+  }
   if(!rawPrefix.trim() && !targets.length) {
     box.hidden = true;
     urlEl.textContent = "";
@@ -1535,7 +1567,8 @@ function updateRoutePreview(){
   meta.innerHTML =
     '<span class="badge">'+targets.length+' 个上游</span>'+
     '<span class="badge">'+escapeHtml(mode)+'</span>'+
-    (routeExists(prefix, oldPrefix) ? '<span class="badge">将覆盖已有路径</span>' : '<span class="badge">可保存</span>');
+    (targetError ? '<span class="badge">'+escapeHtml(targetError)+'</span>' : '')+
+    (targetError ? '<span class="badge">需修正</span>' : routeExists(prefix, oldPrefix) ? '<span class="badge">将覆盖已有路径</span>' : '<span class="badge">可保存</span>');
   box.hidden = false;
   return url;
 }
@@ -1864,11 +1897,18 @@ function editRoute(prefix){
 async function saveRoute(e){
   e.preventDefault();
   const body = { oldPrefix:$("oldPrefix").value, prefix:$("prefix").value, target:$("target").value, mode:$("mode").value, icon:$("icon").value, remark:$("remark").value, cacheImages:$("cacheImages").checked, accessPolicy:{ browserMode:$("browserMode").value } };
-  const clean = normalizeBeginnerPrefix(body.prefix);
-  if(routeExists(clean, body.oldPrefix) && !confirm("/"+clean+" 已存在，是否覆盖这条路由？")) return;
-  body.prefix = clean;
-  await api("/api/routes", { method:"POST", body:JSON.stringify(body) });
-  toast("路径已保存"); newRoute(); await loadRoutes(); await loadStats();
+  try {
+    const clean = normalizeBeginnerPrefix(body.prefix);
+    body.target = normalizeRouteTargetsInput(body.target);
+    if(routeExists(clean, body.oldPrefix) && !confirm("/"+clean+" 已存在，是否覆盖这条路由？")) return;
+    body.prefix = clean;
+    $("target").value = body.target;
+    await api("/api/routes", { method:"POST", body:JSON.stringify(body) });
+    toast("路径已保存"); newRoute(); await loadRoutes(); await loadStats();
+  } catch(e) {
+    toast(e.message || "保存失败");
+    updateRoutePreview();
+  }
 }
 async function moveRoute(prefix, direction){
   const index = routes.findIndex(x => x.prefix === prefix);
@@ -2149,6 +2189,12 @@ function requireDb(env) {
   if (!env.DB) throw new Error("未绑定 D1 数据库，请绑定变量名 DB");
 }
 
+function badRequest(message) {
+  const error = new Error(message);
+  error.status = 400;
+  return error;
+}
+
 function normalizeRoute(input = {}) {
   const accessPolicy = typeof input.access_policy === "string"
     ? safeJson(input.access_policy, {})
@@ -2169,12 +2215,20 @@ function normalizeRoute(input = {}) {
 }
 
 function validateRoute(route) {
-  if (!route.prefix) throw new Error("路径前缀不能为空");
-  if (!/^[a-zA-Z0-9_-]{1,64}$/.test(route.prefix)) throw new Error("路径只允许字母、数字、下划线和短横线");
+  if (!route.prefix) throw badRequest("路径前缀不能为空");
+  if (!/^[a-zA-Z0-9_-]{1,64}$/.test(route.prefix)) throw badRequest("路径只允许字母、数字、下划线和短横线");
   const targets = splitTargets(route.target);
-  if (!targets.length) throw new Error("上游不能为空");
+  if (!targets.length) throw badRequest("上游不能为空");
   for (const target of targets) {
-    if (!/^https?:\/\//i.test(target)) throw new Error(`上游必须以 http:// 或 https:// 开头: ${target}`);
+    let targetUrl;
+    try {
+      targetUrl = new URL(target);
+    } catch {
+      throw badRequest(`上游地址格式不正确: ${target}`);
+    }
+    if (!["http:", "https:"].includes(targetUrl.protocol) || !targetUrl.hostname) {
+      throw badRequest(`上游必须是 http/https 地址: ${target}`);
+    }
   }
 }
 
