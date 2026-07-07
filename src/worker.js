@@ -1192,7 +1192,7 @@ async function saveWizardRoute(e){
 function routeCard(r){
   const targets = routeTargets(r).length;
   const url = location.origin + "/" + r.prefix;
-  return '<article class="route"><div class="route-head"><div><div class="prefix">'+escapeHtml(r.icon || "🎞️")+" /"+escapeHtml(r.prefix)+'</div><div class="muted small">'+escapeHtml(r.remark || "无备注")+'</div></div><span class="badge">'+escapeHtml(r.mode || "clean")+'</span></div><div class="target">'+escapeHtml(r.target)+'</div><div class="status-line"><span class="badge">'+targets+' 个上游</span>'+routeHealthBadge(r.prefix)+'<span class="badge">今日播放 '+(r.todayReqs||0)+'</span><span class="badge">'+(r.cacheImages ? "缓存开" : "缓存关")+'</span></div><div class="actions"><button class="btn" onclick="copyText(\\''+url+'\\')">复制入口</button><button class="btn" onclick="pingRoute(\\''+escapeAttr(r.prefix)+'\\')">测速</button><button class="btn" onclick="editRoute(\\''+escapeAttr(r.prefix)+'\\')">编辑</button><button class="btn danger" onclick="deleteRoute(\\''+escapeAttr(r.prefix)+'\\')">删除</button></div></article>';
+  return '<article class="route"><div class="route-head"><div><div class="prefix">'+escapeHtml(r.icon || "🎞️")+" /"+escapeHtml(r.prefix)+'</div><div class="muted small">'+escapeHtml(r.remark || "无备注")+'</div></div><span class="badge">'+escapeHtml(r.mode || "clean")+'</span></div><div class="target">'+escapeHtml(r.target)+'</div><div class="status-line"><span class="badge">'+targets+' 个上游</span>'+routeHealthBadge(r.prefix)+'<span class="badge">今日播放 '+(r.todayReqs||0)+'</span><span class="badge">'+(r.cacheImages ? "缓存开" : "缓存关")+'</span></div><div class="actions"><button class="btn" onclick="copyText(\\''+url+'\\')">复制入口</button><button class="btn" onclick="pingRoute(\\''+escapeAttr(r.prefix)+'\\')">测速</button><button class="btn" onclick="moveRoute(\\''+escapeAttr(r.prefix)+'\\',-1)">上移</button><button class="btn" onclick="moveRoute(\\''+escapeAttr(r.prefix)+'\\',1)">下移</button><button class="btn" onclick="editRoute(\\''+escapeAttr(r.prefix)+'\\')">编辑</button><button class="btn danger" onclick="deleteRoute(\\''+escapeAttr(r.prefix)+'\\')">删除</button></div></article>';
 }
 function routeTargets(route){
   return String(route.target || "").split(",").map(x => x.trim()).filter(Boolean);
@@ -1262,6 +1262,27 @@ async function saveRoute(e){
   const body = { oldPrefix:$("oldPrefix").value, prefix:$("prefix").value, target:$("target").value, mode:$("mode").value, icon:$("icon").value, remark:$("remark").value, cacheImages:$("cacheImages").checked, accessPolicy:{ browserMode:$("browserMode").value } };
   await api("/api/routes", { method:"POST", body:JSON.stringify(body) });
   toast("路径已保存"); newRoute(); await loadRoutes();
+}
+async function moveRoute(prefix, direction){
+  const index = routes.findIndex(x => x.prefix === prefix);
+  const nextIndex = index + direction;
+  if(index < 0 || nextIndex < 0 || nextIndex >= routes.length) return;
+  const previous = routes.slice();
+  const item = routes.splice(index, 1)[0];
+  routes.splice(nextIndex, 0, item);
+  routes.forEach((route, order) => { route.order_idx = order; });
+  renderRoutes();
+  try {
+    await saveRouteOrder();
+    toast("排序已保存");
+  } catch(e) {
+    routes = previous;
+    renderRoutes();
+    toast("排序保存失败: "+e.message);
+  }
+}
+async function saveRouteOrder(){
+  await api("/api/routes/reorder", { method:"POST", body:JSON.stringify(routes.map(r => r.prefix)) });
 }
 async function deleteRoute(prefix){ if(!confirm("删除 /"+prefix+" ?")) return; await api("/api/routes?prefix="+encodeURIComponent(prefix), { method:"DELETE" }); toast("已删除"); await loadRoutes(); }
 async function pingRoute(prefix){
