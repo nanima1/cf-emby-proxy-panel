@@ -2,9 +2,17 @@
 
 Cloudflare Worker 版 Emby 反代面板。你可以在网页面板里用 `/路径` 管理多个 Emby 上游，拉取优选 IP，并把选中的 IP 自动写入 Cloudflare DNS，让项目域名走 Cloudflare CDN 加速。
 
-> 第一次部署、看不懂 D1 / Wrangler / 变量的，先看这篇超详细教程：
+> 想快速部署，先看：
+>
+> [快速部署](./docs/QUICK_DEPLOY.md)
+>
+> 第一次部署、看不懂 D1 / Wrangler / 变量的，看这篇超详细教程：
 >
 > [小白 Cloudflare 部署教程](./docs/CF_DEPLOY_BEGINNER.md)
+>
+> Cloudflare 仓库导入入口：
+>
+> [Deploy to Cloudflare](https://deploy.workers.cloudflare.com/?url=https://github.com/nanima1/cf-emby-proxy-panel)
 
 这个项目整理自 `double.js`、`Pro-Worker.js` 的最终版逻辑，并合并了 `hbh-proxy worker.js` 与 `反代 + HTML.txt` 里的访问控制、状态页、客户端识别、流代理和缓存思路。
 
